@@ -1,0 +1,136 @@
+event_id,start_date,end_date,event_name,event_category,region,severity
+E001,01-02-2019,01-02-2019,Interim Union Budget 2019,Indian policy,India,medium
+E002,04-03-2019,04-03-2019,US announces termination of India's GSP benefits,Trade policy,India / US,medium
+E003,04-04-2019,04-04-2019,RBI repo-rate cut,Monetary policy,India,medium
+E004,11-04-2019,19-05-2019,2019 Lok Sabha polling,Elections,India,high
+E005,23-05-2019,23-05-2019,2019 Lok Sabha election results,Elections,India,high
+E006,05-06-2019,05-06-2019,US termination of India's GSP benefits takes effect,Trade policy,India / US,medium
+E007,05-07-2019,05-07-2019,Union Budget 2019,Indian policy,India,medium
+E008,01-08-2019,01-08-2019,Federal Reserve rate cut (25 bp),US monetary policy,US,high
+E009,05-08-2019,05-08-2019,Article 370 changes,Domestic policy,India,high
+E010,05-08-2019,05-08-2019,China-US trade escalation and yuan crosses 7 per US dollar,Global trade / FX shock,China / Global,high
+E011,19-09-2019,19-09-2019,Federal Reserve rate cut (25 bp),US monetary policy,US,high
+E012,20-09-2019,20-09-2019,Corporate tax cut announcement,Fiscal / corporate policy,India,high
+E013,31-10-2019,31-10-2019,Federal Reserve rate cut (25 bp),US monetary policy,US,high
+E014,04-11-2019,04-11-2019,India decides not to join RCEP,Trade policy,India / Asia-Pacific,high
+E015,03-01-2020,03-01-2020,US-Iran escalation after killing of Qasem Soleimani,Geopolitical,US / Middle East,high
+E016,30-01-2020,30-01-2020,WHO COVID-19 PHEIC declaration,Pandemic,Global,high
+E017,01-02-2020,01-02-2020,Union Budget 2020,Indian policy,India,medium
+E018,24-02-2020,23-03-2020,Global COVID-19 equity sell-off / India market crash,Pandemic / market shock,Global,high
+E019,04-03-2020,04-03-2020,Federal Reserve emergency rate cut (50 bp),US monetary policy,US,high
+E020,11-03-2020,11-03-2020,WHO COVID-19 pandemic declaration,Pandemic,Global,high
+E021,16-03-2020,16-03-2020,Bank of Japan strengthens COVID-19 monetary easing measures,Japan monetary policy,Japan,high
+E022,16-03-2020,16-03-2020,Federal Reserve emergency rate cut to 0–0.25%,US monetary policy,US,high
+E023,18-03-2020,18-03-2020,ECB launches Pandemic Emergency Purchase Programme (PEPP),European monetary policy,Europe,high
+E024,23-03-2020,23-03-2020,Global financial-market liquidity shock during COVID-19,Global financial shock,Global,high
+E025,24-03-2020,24-03-2020,India nationwide COVID-19 lockdown announcement,Pandemic / domestic policy,India,high
+E026,27-03-2020,27-03-2020,RBI emergency COVID-19 measures,Monetary / crisis response,India,high
+E027,22-05-2020,22-05-2020,RBI pandemic policy measures,Monetary / crisis response,India,high
+E028,27-08-2020,27-08-2020,Federal Reserve adopts flexible average inflation targeting framework,US monetary policy,US,high
+E029,03-11-2020,03-11-2020,US presidential election,Elections,Global,medium
+E030,15-11-2020,15-11-2020,RCEP signed without India,Trade policy,Asia-Pacific,medium
+E031,06-01-2021,06-01-2021,US Capitol attack,Political shock,US,medium
+E032,01-02-2021,01-02-2021,Union Budget 2021,Indian policy,India,medium
+E033,22-02-2021,22-02-2021,India-Mauritius CECPA signed,Trade / FTA,India / Mauritius,medium
+E034,01-04-2021,01-04-2021,India-Mauritius CECPA enters into force,Trade / FTA,India / Mauritius,medium
+E035,01-04-2021,31-05-2021,India COVID-19 second wave,Pandemic / market shock,India,high
+E036,09-09-2021,10-09-2021,BRICS Summit 2021,International summit,Global,medium
+E037,01-11-2021,30-11-2021,India reopening / post-second-wave recovery,Pandemic / economic reopening,India,medium
+E038,03-11-2021,03-11-2021,Federal Reserve announces tapering of asset purchases,US monetary policy,US,high
+E039,01-02-2022,01-02-2022,Union Budget 2022,Indian policy,India,medium
+E040,18-02-2022,18-02-2022,India-UAE CEPA signed,Trade / FTA,India / UAE,high
+E041,24-02-2022,31-03-2022,Russia-Ukraine full-scale invasion / initial market shock,Geopolitical,Global,high
+E042,17-03-2022,17-03-2022,Federal Reserve begins tightening cycle (25 bp hike),US monetary policy,US,high
+E043,02-04-2022,02-04-2022,India-Australia ECTA signed,Trade / FTA,India / Australia,high
+E044,01-05-2022,01-05-2022,India-UAE CEPA enters into force,Trade / FTA,India / UAE,high
+E045,04-05-2022,04-05-2022,RBI repo-rate hike,Monetary policy,India,high
+E046,05-05-2022,05-05-2022,Federal Reserve 50 bp rate hike and balance-sheet runoff plan,US monetary policy,US,high
+E047,08-06-2022,08-06-2022,RBI repo-rate hike,Monetary policy,India,high
+E048,16-06-2022,16-06-2022,Federal Reserve 75 bp rate hike,US monetary policy,US,high
+E049,21-07-2022,21-07-2022,ECB begins rate-hiking cycle,European monetary policy,Europe,high
+E050,28-07-2022,28-07-2022,Federal Reserve 75 bp rate hike,US monetary policy,US,high
+E051,05-08-2022,05-08-2022,RBI repo-rate hike,Monetary policy,India,high
+E052,08-09-2022,08-09-2022,ECB 75 bp rate hike,European monetary policy,Europe,high
+E053,22-09-2022,22-09-2022,Federal Reserve 75 bp rate hike,US monetary policy,US,high
+E054,30-09-2022,30-09-2022,RBI repo-rate hike,Monetary policy,India,high
+E055,27-10-2022,27-10-2022,ECB 75 bp rate hike,European monetary policy,Europe,high
+E056,03-11-2022,03-11-2022,Federal Reserve 75 bp rate hike,US monetary policy,US,high
+E057,08-11-2022,08-11-2022,US midterm elections,Elections,US,medium
+E058,15-11-2022,16-11-2022,G20 Bali Summit,International summit,Global,medium
+E059,07-12-2022,07-12-2022,RBI repo-rate hike,Monetary policy,India,high
+E060,15-12-2022,15-12-2022,ECB 50 bp rate hike and QT guidance,European monetary policy,Europe,high
+E061,15-12-2022,15-12-2022,Federal Reserve 50 bp rate hike,US monetary policy,US,high
+E062,20-12-2022,20-12-2022,Bank of Japan widens 10-year JGB yield band,Japan monetary policy,Japan,high
+E063,29-12-2022,29-12-2022,India-Australia ECTA enters into force,Trade / FTA,India / Australia,high
+E064,25-01-2023,01-02-2023,Hindenburg / Adani shock,Domestic market shock,India,high
+E065,01-02-2023,01-02-2023,Union Budget 2023,Indian policy,India,medium
+E066,02-02-2023,02-02-2023,Federal Reserve 25 bp rate hike,US monetary policy,US,high
+E067,08-02-2023,08-02-2023,RBI repo-rate hike,Monetary policy,India,high
+E068,10-03-2023,10-03-2023,Silicon Valley Bank failure,Banking crisis,US / Global,high
+E069,12-03-2023,12-03-2023,US authorities announce banking-system backstop after SVB failure,Banking crisis,US / Global,high
+E070,19-03-2023,19-03-2023,UBS agrees to acquire Credit Suisse,Banking crisis,Europe / Global,high
+E071,23-03-2023,23-03-2023,Federal Reserve 25 bp rate hike amid US banking stress,US monetary policy / banking,US,high
+E072,04-05-2023,04-05-2023,Federal Reserve 25 bp rate hike,US monetary policy,US,high
+E073,05-05-2023,05-05-2023,RBI policy pause,Monetary policy,India,medium
+E074,27-07-2023,27-07-2023,ECB 25 bp rate hike,European monetary policy,Europe,high
+E075,27-07-2023,27-07-2023,Federal Reserve final 25 bp hike of 2022–23 cycle,US monetary policy,US,high
+E076,09-09-2023,10-09-2023,G20 New Delhi Summit,International summit,Global,high
+E077,07-10-2023,31-10-2023,Israel-Hamas / Middle-East geopolitical shock,Geopolitical,Global,high
+E078,30-11-2023,30-11-2023,OPEC+ extends/adjusts production policy amid oil-market uncertainty,Commodity / energy policy,Global,medium
+E079,02-01-2024,02-01-2024,Japan Noto earthquake and market disruption,Natural disaster / market shock,Japan,medium
+E080,01-02-2024,01-02-2024,Interim Union Budget 2024,Indian policy,India,medium
+E081,10-03-2024,10-03-2024,India-EFTA TEPA signed,Trade / FTA,India / Europe,high
+E082,19-03-2024,19-03-2024,Bank of Japan ends negative interest rates and yield-curve control,Japan monetary policy,Japan,high
+E083,13-04-2024,15-04-2024,Iran-Israel direct military escalation,Geopolitical,Global,high
+E084,19-04-2024,01-06-2024,2024 Lok Sabha polling,Elections,India,high
+E085,14-05-2024,14-05-2024,US announces major Section 301 tariff increases on Chinese strategic products,Global trade policy,Global,high
+E086,04-06-2024,04-06-2024,2024 Lok Sabha election results,Elections,India,high
+E087,06-06-2024,06-06-2024,ECB begins easing cycle (25 bp cut),European monetary policy,Europe,high
+E088,23-07-2024,23-07-2024,Union Budget 2024,Indian policy,India,medium
+E089,31-07-2024,31-07-2024,Bank of Japan policy normalization contributes to yen carry-trade unwind risk,Japan monetary / global market shock,Japan / Global,high
+E090,31-07-2024,31-07-2024,Bank of Japan raises policy rate to 0.25%,Japan monetary policy,Japan,high
+E091,05-08-2024,05-08-2024,Global volatility / yen carry-trade shock,Global market shock,Global,high
+E092,12-09-2024,12-09-2024,ECB 25 bp rate cut,European monetary policy,Europe,high
+E093,13-09-2024,13-09-2024,US finalizes 2024 Section 301 China tariff increases,Global trade policy,Global,medium
+E094,19-09-2024,19-09-2024,Federal Reserve begins easing cycle (50 bp cut),US monetary policy,US,high
+E095,05-11-2024,05-11-2024,US presidential election,Elections,Global,medium
+E096,08-11-2024,08-11-2024,Federal Reserve 25 bp rate cut,US monetary policy,US,high
+E097,11-12-2024,11-12-2024,"US increases Section 301 tariffs on Chinese tungsten, wafers and polysilicon; changes effective Jan 1 2025",Global trade policy,Global,medium
+E098,19-12-2024,19-12-2024,Federal Reserve 25 bp rate cut,US monetary policy,US,high
+E099,24-01-2025,24-01-2025,Bank of Japan raises policy rate to 0.50%,Japan monetary policy,Japan,high
+E100,01-02-2025,01-02-2025,"US announces additional tariffs on Canada, Mexico and China",Global trade policy,Global,high
+E101,01-02-2025,01-02-2025,Union Budget 2025,Indian policy,India,medium
+E102,04-02-2025,04-02-2025,"US tariffs on Canada, Mexico and China take effect",Global trade policy,Global,high
+E103,07-02-2025,07-02-2025,RBI repo-rate cut,Monetary policy,India,high
+E104,24-02-2025,24-02-2025,India-UK FTA negotiations resumed,Trade / FTA,India / UK,medium
+E105,04-03-2025,04-03-2025,US Canada/Mexico tariffs take effect after pause; China tariff escalation,Global trade policy,Global,high
+E106,02-04-2025,02-04-2025,US Reciprocal Tariffs / Liberation Day announcement,Global trade policy,Global,high
+E107,05-04-2025,05-04-2025,US 10% baseline tariff takes effect,Global trade policy,Global,high
+E108,09-04-2025,09-04-2025,"US country-specific reciprocal tariff rates announced, including India",Global trade policy,Global,high
+E109,10-04-2025,10-04-2025,US pauses most country-specific reciprocal tariffs for 90 days; 10% rate applies,Global trade policy,Global,high
+E110,22-04-2025,22-04-2025,Pahalgam terror attack,Geopolitical / domestic shock,India,high
+E111,06-05-2025,06-05-2025,India-UK FTA negotiations concluded,Trade / FTA,India / UK,high
+E112,07-05-2025,10-05-2025,India-Pakistan military escalation / Operation Sindoor,Geopolitical,India,high
+E113,14-05-2025,14-05-2025,US-China tariff de-escalation / 90-day suspension,Global trade policy,Global,high
+E114,05-06-2025,05-06-2025,ECB 25 bp rate cut,European monetary policy,Europe,high
+E115,06-06-2025,06-06-2025,RBI repo-rate cut,Monetary policy,India,high
+E116,06-07-2025,07-07-2025,BRICS Summit 2025,International summit,Global,medium
+E117,24-07-2025,24-07-2025,India-UK Comprehensive Economic and Trade Agreement signed,Trade / FTA,India / UK,high
+E118,31-07-2025,31-07-2025,US announces 25% tariff on Indian goods,Global trade policy,India / Global,high
+E119,06-08-2025,06-08-2025,US announces additional 25% India tariff linked to Russian oil purchases,Global trade policy / geopolitics,India / Global,high
+E120,07-08-2025,07-08-2025,25% US tariff on Indian goods takes effect,Global trade policy,India / Global,high
+E121,27-08-2025,27-08-2025,"Additional 25% US tariff on Indian goods takes effect, linked to Russian oil purchases",Global trade policy / geopolitics,India / Global,high
+E122,18-09-2025,18-09-2025,Federal Reserve 25 bp rate cut,US monetary policy,US,high
+E123,01-10-2025,01-10-2025,India-EFTA TEPA enters into force,Trade / FTA,India / Europe,high
+E124,30-10-2025,30-10-2025,Federal Reserve 25 bp rate cut,US monetary policy,US,high
+E125,11-12-2025,11-12-2025,Federal Reserve 25 bp rate cut,US monetary policy,US,high
+E126,18-12-2025,18-12-2025,India-Oman CEPA signed,Trade / FTA,India / Oman,medium
+E127,22-12-2025,22-12-2025,India-New Zealand FTA negotiations concluded,Trade / FTA,India / New Zealand,high
+E128,27-01-2026,27-01-2026,India-EU Free Trade Agreement negotiations concluded,Trade / FTA,India / European Union,high
+E129,01-02-2026,01-02-2026,Union Budget 2026,Indian policy,India,medium
+E130,02-02-2026,02-02-2026,India-US interim trade agreement announced,Trade / FTA,India / US,high
+E131,04-02-2026,06-02-2026,RBI MPC meeting / policy window,Monetary policy,India,medium
+E132,07-02-2026,07-02-2026,India-US interim trade agreement framework announced jointly,Trade / FTA,India / US,high
+E133,15-07-2026,15-07-2026,India-UK FTA enters into force,Trade / FTA,India / UK,high
+E134,29-07-2026,29-07-2026,Federal Reserve holds 3.50–3.75% target range amid elevated uncertainty,US monetary policy,US,medium
+E135,12-09-2026,13-09-2026,"18th BRICS Summit, New Delhi",International summit,Global,high
