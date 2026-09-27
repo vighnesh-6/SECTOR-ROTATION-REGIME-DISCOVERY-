@@ -1,0 +1,15 @@
+# Phase 1 — Data Collection
+# Core data handling
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Yahoo Finance data
+yfinance>=0.2.40
+
+# Jupyter
+jupyter>=1.0.0
+notebook>=7.0.0
+ipykernel>=6.0.0
+
+# Utilities
+requests>=2.31.0
