@@ -263,10 +263,26 @@ def select_kmeans_k(
     """
     Select optimal K for K-Means from CV metrics.
     Criterion: highest mean validation silhouette across folds.
+    Candidate K must have valid silhouette scores in all configured folds (FOLDS).
     Ties within tol: prefer smaller K.
     """
-    subset   = metrics_df[metrics_df["scaler"] == scaler_type]
-    mean_sil = subset.groupby("k")["val_silhouette"].mean()
+    subset = metrics_df[metrics_df["scaler"] == scaler_type]
+    valid_counts = (
+        subset[subset["val_silhouette"].notna()]
+        .groupby("k")["val_silhouette"]
+        .count()
+    )
+    n_required_folds = len(FOLDS)
+    valid_k = valid_counts[valid_counts == n_required_folds].index.tolist()
+    if not valid_k:
+        raise ValueError(
+            f"No candidate K has valid silhouette scores in all {n_required_folds} configured folds for {scaler_type} scaler."
+        )
+    mean_sil = (
+        subset[subset["k"].isin(valid_k)]
+        .groupby("k")["val_silhouette"]
+        .mean()
+    )
     best_sil = mean_sil.max()
     candidates = mean_sil[mean_sil >= best_sil - tol].index.tolist()
     return int(min(candidates))
@@ -276,6 +292,98 @@ def select_kmeans_k(
 # GMM
 # ---------------------------------------------------------------------------
 
+def select_gmm_cov_type(
+    X_train_sc: np.ndarray,
+    k: int,
+    candidate_cov_types: List[str] = GMM_COVARIANCE_TYPES,
+    reg_covar: float = 1e-6,
+    n_init: int = 10,
+    max_iter: int = 500,
+    random_state: int = 42,
+) -> Tuple[str, GaussianMixture, float]:
+    """
+    Select the optimal covariance type for a given training slice and candidate K
+    using ONLY that training slice.
+
+    Criterion: Minimum training BIC among models that converged without covariance warnings.
+    Fallback: 'diag' if no candidate model converges cleanly.
+
+    Returns: (best_cov_type, best_fitted_model, best_bic)
+    """
+    from sklearn.exceptions import ConvergenceWarning
+
+    best_cov = "diag"
+    best_bic = np.inf
+    best_model = None
+
+    for cov_type in candidate_cov_types:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            try:
+                gm = GaussianMixture(
+                    n_components=k,
+                    covariance_type=cov_type,
+                    reg_covar=reg_covar,
+                    n_init=n_init,
+                    max_iter=max_iter,
+                    random_state=random_state,
+                ).fit(X_train_sc)
+
+                converged = bool(gm.converged_)
+                cov_warns = [
+                    x for x in w
+                    if issubclass(x.category, (ConvergenceWarning, RuntimeWarning))
+                    and ("covariance" in str(x.message).lower()
+                         or "not converge" in str(x.message).lower())
+                ]
+                if cov_warns:
+                    converged = False
+
+                if converged:
+                    bic = float(gm.bic(X_train_sc))
+                    if bic < best_bic:
+                        best_bic = bic
+                        best_cov = cov_type
+                        best_model = gm
+            except Exception:
+                pass
+
+    if best_model is None:
+        # Fallback to diag
+        best_cov = "diag"
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            best_model = GaussianMixture(
+                n_components=k,
+                covariance_type="diag",
+                reg_covar=reg_covar,
+                n_init=n_init,
+                max_iter=max_iter,
+                random_state=random_state,
+            ).fit(X_train_sc)
+        best_bic = float(best_model.bic(X_train_sc)) if best_model.converged_ else np.nan
+
+    return best_cov, best_model, best_bic
+
+
+def select_gmm_covariance(
+    metrics_df: pd.DataFrame,
+    selected_k: int,
+    scaler_type: str = "robust",
+) -> str:
+    """
+    Select the final covariance type for the chosen K using CV fold evidence.
+    Criterion: Majority vote among the fold-specific selected covariance types for selected_k.
+    """
+    subset = metrics_df[
+        (metrics_df["scaler"] == scaler_type) & (metrics_df["k"] == selected_k)
+    ]
+    if subset.empty:
+        return "full"
+    cov_counts = subset["covariance_type"].value_counts()
+    return str(cov_counts.index[0])
+
+
 def _probe_covariance_type(
     X_tr_sc: np.ndarray,
     candidate_k: List[int],
@@ -284,50 +392,22 @@ def _probe_covariance_type(
     max_iter: int = 500,
     random_state: int = 42,
 ) -> str:
-    """
-    Determine the covariance type to use for all GMM fits of this scaler variant.
-    Tests 'full' -> 'diag' -> 'tied' in order on the largest training slice.
-    Returns the first type that converges for all candidate K values.
-    """
-    from sklearn.exceptions import ConvergenceWarning
-    for cov_type in GMM_COVARIANCE_TYPES:
-        all_converged = True
-        for k in candidate_k:
-            with warnings.catch_warnings(record=True) as w:
-                warnings.simplefilter("always")
-                try:
-                    gm = GaussianMixture(
-                        n_components=k,
-                        covariance_type=cov_type,
-                        reg_covar=reg_covar,
-                        n_init=n_init,
-                        max_iter=max_iter,
-                        random_state=random_state,
-                    ).fit(X_tr_sc)
-                    if not gm.converged_:
-                        all_converged = False
-                        break
-                    cov_warns = [
-                        x for x in w
-                        if issubclass(x.category, (ConvergenceWarning, RuntimeWarning))
-                        and ("covariance" in str(x.message).lower()
-                             or "not converge" in str(x.message).lower())
-                    ]
-                    if cov_warns:
-                        all_converged = False
-                        break
-                except Exception:
-                    all_converged = False
-                    break
-        if all_converged:
-            return cov_type
-    return "diag"
+    """Legacy helper: selects consensus covariance type for candidate K on given training data via min training BIC."""
+    best_covs = [
+        select_gmm_cov_type(
+            X_tr_sc, k, reg_covar=reg_covar, n_init=n_init, max_iter=max_iter, random_state=random_state
+        )[0]
+        for k in candidate_k
+    ]
+    from collections import Counter
+    return Counter(best_covs).most_common(1)[0][0]
 
 
 def run_gmm_cv(
     folds: List[Dict[str, Any]],
     scaler_type: str = "robust",
     candidate_k: List[int] = CANDIDATE_K,
+    candidate_cov_types: List[str] = GMM_COVARIANCE_TYPES,
     reg_covar: float = 1e-6,
     n_init: int = 10,
     max_iter: int = 500,
@@ -336,40 +416,34 @@ def run_gmm_cv(
     """
     Run GMM cross-validation across all folds and candidate K values.
 
-    Covariance type is determined once from the largest fold (F3) training data,
-    then fixed for all K and all folds so BIC comparisons remain valid.
+    Temporal leakage fix:
+      Covariance type is selected INDEPENDENTLY for each fold and candidate K
+      using ONLY that fold's training data (via minimum training BIC).
+      Validation and holdout data are NEVER accessed during covariance selection.
 
     Primary K-selection metric: mean validation log-likelihood per observation.
     Supporting: training BIC, training AIC, posterior entropy, convergence, persistence.
 
-    Returns (metrics_df, chosen_covariance_type).
+    Returns (metrics_df, consensus_covariance_type).
     """
-    fold3   = [f for f in folds if f["fold_id"] == "F3"][0]
-    X_tr_f3, _, _ = fit_scale_fold(fold3["X_train"], fold3["X_val"], scaler_type)
-    chosen_cov = _probe_covariance_type(
-        X_tr_f3, candidate_k, reg_covar, n_init, max_iter, random_state
-    )
-
     records = []
     for fold in folds:
         X_tr_sc, X_va_sc, _ = fit_scale_fold(
             fold["X_train"], fold["X_val"], scaler_type
         )
         for k in candidate_k:
-            with warnings.catch_warnings(record=True):
-                warnings.simplefilter("always")
-                gm = GaussianMixture(
-                    n_components=k,
-                    covariance_type=chosen_cov,
-                    reg_covar=reg_covar,
-                    n_init=n_init,
-                    max_iter=max_iter,
-                    random_state=random_state,
-                ).fit(X_tr_sc)
+            best_cov, gm, train_bic = select_gmm_cov_type(
+                X_tr_sc,
+                k,
+                candidate_cov_types=candidate_cov_types,
+                reg_covar=reg_covar,
+                n_init=n_init,
+                max_iter=max_iter,
+                random_state=random_state,
+            )
 
             converged  = bool(gm.converged_)
             val_ll     = float(gm.score(X_va_sc))   if converged else np.nan
-            train_bic  = float(gm.bic(X_tr_sc))     if converged else np.nan
             train_aic  = float(gm.aic(X_tr_sc))     if converged else np.nan
             train_ll   = float(gm.score(X_tr_sc))   if converged else np.nan
 
@@ -382,11 +456,12 @@ def run_gmm_cv(
             records.append(
                 {
                     "scaler":                     scaler_type,
-                    "covariance_type":            chosen_cov,
                     "fold":                       fold["fold_id"],
                     "n_train":                    fold["n_train"],
                     "n_val":                      fold["n_val"],
                     "k":                          k,
+                    "covariance_type":            best_cov,
+                    "selection_criterion":        "min_train_bic",
                     "converged":                  converged,
                     "val_ll_per_obs":             val_ll,
                     "train_bic":                  train_bic,
@@ -397,7 +472,15 @@ def run_gmm_cv(
                     "val_n_unique_labels":        n_unique,
                 }
             )
-    return pd.DataFrame(records), chosen_cov
+
+    metrics_df = pd.DataFrame(records)
+    try:
+        k_opt = select_gmm_k(metrics_df, scaler_type=scaler_type)
+        consensus_cov = select_gmm_covariance(metrics_df, k_opt, scaler_type=scaler_type)
+    except Exception:
+        consensus_cov = "full"
+
+    return metrics_df, consensus_cov
 
 
 def select_gmm_k(
@@ -497,10 +580,12 @@ def _fit_hmm_multi_seed(
     best_model    = None
     best_train_ll = -np.inf
     seed_records  = []
+    T_train       = len(X_train)
 
     for seed in seeds:
         converged = False
-        train_ll  = np.nan
+        total_train_ll = np.nan
+        train_ll_per_obs = np.nan
         try:
             model = GaussianHMM(
                 n_components=k,
@@ -511,18 +596,25 @@ def _fit_hmm_multi_seed(
             )
             with warnings.catch_warnings(record=True):
                 warnings.simplefilter("always")
-                model.fit(X_train, lengths=[len(X_train)])
+                model.fit(X_train, lengths=[T_train])
             converged = bool(model.monitor_.converged)
             if converged:
-                train_ll = float(model.score(X_train, lengths=[len(X_train)]))
+                total_train_ll = float(model.score(X_train, lengths=[T_train]))
+                train_ll_per_obs = total_train_ll / T_train
         except Exception:
             pass
 
         seed_records.append(
-            {"k": k, "seed": seed, "converged": converged, "train_ll_per_obs": train_ll}
+            {
+                "k": k,
+                "seed": seed,
+                "converged": converged,
+                "total_train_ll": total_train_ll,
+                "train_ll_per_obs": train_ll_per_obs,
+            }
         )
-        if converged and not np.isnan(train_ll) and train_ll > best_train_ll:
-            best_train_ll = train_ll
+        if converged and not np.isnan(train_ll_per_obs) and train_ll_per_obs > best_train_ll:
+            best_train_ll = train_ll_per_obs
             best_model    = model
 
     return best_model, seed_records
@@ -566,18 +658,25 @@ def run_hmm_cv(
                 X_tr_sc, k, covariance_type, n_iter, tol, seeds
             )
 
-            train_lls   = [
+            train_lls_per_obs = [
                 r["train_ll_per_obs"]
                 for r in seed_recs
                 if r["converged"] and not np.isnan(r["train_ll_per_obs"])
             ]
+            train_lls_total = [
+                r["total_train_ll"]
+                for r in seed_recs
+                if r["converged"] and not np.isnan(r["total_train_ll"])
+            ]
             n_converged  = sum(r["converged"] for r in seed_recs)
-            train_ll_std = float(np.std(train_lls)) if len(train_lls) > 1 else np.nan
-            best_train_ll = float(np.max(train_lls)) if train_lls else np.nan
+            train_ll_std = float(np.std(train_lls_per_obs)) if len(train_lls_per_obs) > 1 else np.nan
+            best_train_ll_per_obs = float(np.max(train_lls_per_obs)) if train_lls_per_obs else np.nan
+            best_train_ll_total   = float(np.max(train_lls_total)) if train_lls_total else np.nan
 
             if best_model is not None:
-                # Validation log-likelihood: model.score uses forward algorithm
-                val_ll = float(best_model.score(X_va_sc, lengths=[len(X_va_sc)]))
+                # Validation log-likelihood: model.score uses forward algorithm (total sequence score)
+                val_ll_total   = float(best_model.score(X_va_sc, lengths=[len(X_va_sc)]))
+                val_ll_per_obs = val_ll_total / len(X_va_sc)
 
                 # Retrospective Viterbi (uses full sequence; NOT a real-time signal)
                 viterbi_train = best_model.predict(X_tr_sc, lengths=[len(X_tr_sc)])
@@ -590,7 +689,7 @@ def run_hmm_cv(
                 min_stat     = float(stationary.min())
                 trans_diag_mean = float(trans_diag.mean())
             else:
-                val_ll = train_dur = val_dur = min_stat = trans_diag_mean = np.nan
+                val_ll_total = val_ll_per_obs = train_dur = val_dur = min_stat = trans_diag_mean = np.nan
 
             records.append(
                 {
@@ -601,10 +700,12 @@ def run_hmm_cv(
                     "n_val":                           fold["n_val"],
                     "k":                               k,
                     "n_seeds_converged":               n_converged,
-                    "best_train_ll_per_obs":           best_train_ll,
+                    "best_train_ll_total":             best_train_ll_total,
+                    "best_train_ll_per_obs":           best_train_ll_per_obs,
                     "train_ll_std":                    train_ll_std,
                     # Primary K-selection metric (forward algorithm - causal):
-                    "val_ll_per_obs":                  val_ll,
+                    "val_ll_total":                    val_ll_total,
+                    "val_ll_per_obs":                  val_ll_per_obs,
                     # Retrospective Viterbi diagnostics only:
                     "viterbi_train_median_duration_retrospective": train_dur,
                     "viterbi_val_median_duration_retrospective":   val_dur,
@@ -701,16 +802,26 @@ def fit_final_hmm(
     best_model, seed_recs = _fit_hmm_multi_seed(
         X_train_sc, k, covariance_type, n_iter, tol, seeds
     )
-    train_lls   = [
+    train_lls_per_obs = [
         r["train_ll_per_obs"]
         for r in seed_recs
         if r["converged"] and not np.isnan(r["train_ll_per_obs"])
     ]
+    train_lls_total = [
+        r["total_train_ll"]
+        for r in seed_recs
+        if r["converged"] and not np.isnan(r["total_train_ll"])
+    ]
     n_converged = sum(r["converged"] for r in seed_recs)
+    best_train_ll_per_obs = float(np.max(train_lls_per_obs)) if train_lls_per_obs else np.nan
+    best_train_ll_total   = float(np.max(train_lls_total)) if train_lls_total else np.nan
+
     diagnostics = {
-        "n_seeds_converged": n_converged,
-        "train_ll_std":      float(np.std(train_lls)) if len(train_lls) > 1 else np.nan,
-        "best_train_ll":     float(np.max(train_lls)) if train_lls else np.nan,
+        "n_seeds_converged":     n_converged,
+        "train_ll_std":          float(np.std(train_lls_per_obs)) if len(train_lls_per_obs) > 1 else np.nan,
+        "best_train_ll":         best_train_ll_per_obs,
+        "best_train_ll_per_obs": best_train_ll_per_obs,
+        "best_train_ll_total":   best_train_ll_total,
     }
     if best_model is not None:
         diagnostics["transition_matrix"]  = best_model.transmat_.tolist()
@@ -857,12 +968,14 @@ def evaluate_holdout(
         filtered_proba  = assign_filtered_proba_hmm(model, X_ho_sc)
         filtered_labels = np.argmax(filtered_proba, axis=1)
 
+        total_ll = float(model.score(X_ho_sc, lengths=[len(X_ho_sc)]))
+        ll_per_obs = total_ll / len(X_ho_sc)
+
         result["viterbi_labels_retrospective"] = viterbi_labels
         result["filtered_proba_causal"]        = filtered_proba
         result["filtered_labels_causal"]       = filtered_labels
-        result["ll_per_obs"]                   = float(
-            model.score(X_ho_sc, lengths=[len(X_ho_sc)])
-        )
+        result["total_ll"]                     = total_ll
+        result["ll_per_obs"]                   = ll_per_obs
         result["viterbi_median_duration_retrospective"] = median_regime_duration(viterbi_labels)
         result["filtered_median_duration_causal"]       = median_regime_duration(filtered_labels)
 
