@@ -1,0 +1,217 @@
+model,label_type,period,regime_id,economic_name,n_observations,pct_holdout_days,sample_size_flag,sector_1,sector_2,correlation
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,AUTO,AUTO,1.0
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,AUTO,BANK,0.9128
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,AUTO,FMCG,0.9433
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,AUTO,IT,0.8005
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,AUTO,METAL,0.8584
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,AUTO,PHARMA,0.3408
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,BANK,AUTO,0.9128
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,BANK,BANK,1.0
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,BANK,FMCG,0.9422
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,BANK,IT,0.9068
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,BANK,METAL,0.8985
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,BANK,PHARMA,0.1132
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,FMCG,AUTO,0.9433
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,FMCG,BANK,0.9422
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,FMCG,FMCG,1.0
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,FMCG,IT,0.8697
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,FMCG,METAL,0.867
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,FMCG,PHARMA,0.0976
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,IT,AUTO,0.8005
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,IT,BANK,0.9068
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,IT,FMCG,0.8697
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,IT,IT,1.0
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,IT,METAL,0.9698
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,IT,PHARMA,-0.0733
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,METAL,AUTO,0.8584
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,METAL,BANK,0.8985
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,METAL,FMCG,0.867
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,METAL,IT,0.9698
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,METAL,METAL,1.0
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,METAL,PHARMA,0.044
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,PHARMA,AUTO,0.3408
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,PHARMA,BANK,0.1132
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,PHARMA,FMCG,0.0976
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,PHARMA,IT,-0.0733
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,PHARMA,METAL,0.044
+hmm,filtered_causal,holdout,0,Cyclical Reflation Rally,8,1.9,low_sample_unstable,PHARMA,PHARMA,1.0
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,AUTO,AUTO,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,AUTO,BANK,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,AUTO,FMCG,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,AUTO,IT,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,AUTO,METAL,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,AUTO,PHARMA,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,BANK,AUTO,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,BANK,BANK,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,BANK,FMCG,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,BANK,IT,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,BANK,METAL,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,BANK,PHARMA,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,FMCG,AUTO,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,FMCG,BANK,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,FMCG,FMCG,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,FMCG,IT,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,FMCG,METAL,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,FMCG,PHARMA,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,IT,AUTO,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,IT,BANK,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,IT,FMCG,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,IT,IT,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,IT,METAL,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,IT,PHARMA,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,METAL,AUTO,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,METAL,BANK,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,METAL,FMCG,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,METAL,IT,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,METAL,METAL,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,METAL,PHARMA,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,PHARMA,AUTO,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,PHARMA,BANK,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,PHARMA,FMCG,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,PHARMA,IT,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,PHARMA,METAL,
+hmm,filtered_causal,holdout,1,High-Volatility Post-Crash Bounce,0,0.0,absent_in_holdout,PHARMA,PHARMA,
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,AUTO,AUTO,1.0
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,AUTO,BANK,0.4992
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,AUTO,FMCG,0.3692
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,AUTO,IT,0.1707
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,AUTO,METAL,0.4225
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,AUTO,PHARMA,0.5597
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,BANK,AUTO,0.4992
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,BANK,BANK,1.0
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,BANK,FMCG,0.2608
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,BANK,IT,0.2513
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,BANK,METAL,0.5601
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,BANK,PHARMA,0.4909
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,FMCG,AUTO,0.3692
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,FMCG,BANK,0.2608
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,FMCG,FMCG,1.0
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,FMCG,IT,0.1554
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,FMCG,METAL,0.1143
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,FMCG,PHARMA,0.1295
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,IT,AUTO,0.1707
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,IT,BANK,0.2513
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,IT,FMCG,0.1554
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,IT,IT,1.0
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,IT,METAL,0.1454
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,IT,PHARMA,0.215
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,METAL,AUTO,0.4225
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,METAL,BANK,0.5601
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,METAL,FMCG,0.1143
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,METAL,IT,0.1454
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,METAL,METAL,1.0
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,METAL,PHARMA,0.4398
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,PHARMA,AUTO,0.5597
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,PHARMA,BANK,0.4909
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,PHARMA,FMCG,0.1295
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,PHARMA,IT,0.215
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,PHARMA,METAL,0.4398
+hmm,filtered_causal,holdout,2,Low-Volatility Consolidation / Base,118,27.96,sufficient,PHARMA,PHARMA,1.0
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,AUTO,AUTO,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,AUTO,BANK,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,AUTO,FMCG,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,AUTO,IT,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,AUTO,METAL,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,AUTO,PHARMA,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,BANK,AUTO,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,BANK,BANK,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,BANK,FMCG,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,BANK,IT,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,BANK,METAL,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,BANK,PHARMA,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,FMCG,AUTO,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,FMCG,BANK,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,FMCG,FMCG,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,FMCG,IT,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,FMCG,METAL,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,FMCG,PHARMA,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,IT,AUTO,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,IT,BANK,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,IT,FMCG,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,IT,IT,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,IT,METAL,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,IT,PHARMA,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,METAL,AUTO,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,METAL,BANK,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,METAL,FMCG,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,METAL,IT,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,METAL,METAL,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,METAL,PHARMA,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,PHARMA,AUTO,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,PHARMA,BANK,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,PHARMA,FMCG,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,PHARMA,IT,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,PHARMA,METAL,
+hmm,filtered_causal,holdout,3,Acute Liquidation / Flight to Safety,0,0.0,absent_in_holdout,PHARMA,PHARMA,
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,AUTO,AUTO,1.0
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,AUTO,BANK,0.5147
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,AUTO,FMCG,0.3593
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,AUTO,IT,0.2969
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,AUTO,METAL,0.3654
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,AUTO,PHARMA,0.2196
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,BANK,AUTO,0.5147
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,BANK,BANK,1.0
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,BANK,FMCG,0.4477
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,BANK,IT,0.3281
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,BANK,METAL,0.4741
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,BANK,PHARMA,0.3688
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,FMCG,AUTO,0.3593
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,FMCG,BANK,0.4477
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,FMCG,FMCG,1.0
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,FMCG,IT,0.1916
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,FMCG,METAL,0.1766
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,FMCG,PHARMA,0.3105
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,IT,AUTO,0.2969
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,IT,BANK,0.3281
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,IT,FMCG,0.1916
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,IT,IT,1.0
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,IT,METAL,0.2585
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,IT,PHARMA,0.2232
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,METAL,AUTO,0.3654
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,METAL,BANK,0.4741
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,METAL,FMCG,0.1766
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,METAL,IT,0.2585
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,METAL,METAL,1.0
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,METAL,PHARMA,0.3434
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,PHARMA,AUTO,0.2196
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,PHARMA,BANK,0.3688
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,PHARMA,FMCG,0.3105
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,PHARMA,IT,0.2232
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,PHARMA,METAL,0.3434
+hmm,filtered_causal,holdout,4,Steady Expansion / Low-Volatility Bull,170,40.28,sufficient,PHARMA,PHARMA,1.0
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,AUTO,AUTO,1.0
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,AUTO,BANK,0.8149
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,AUTO,FMCG,0.603
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,AUTO,IT,0.3754
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,AUTO,METAL,0.7231
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,AUTO,PHARMA,0.5744
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,BANK,AUTO,0.8149
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,BANK,BANK,1.0
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,BANK,FMCG,0.5586
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,BANK,IT,0.2535
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,BANK,METAL,0.6039
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,BANK,PHARMA,0.456
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,FMCG,AUTO,0.603
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,FMCG,BANK,0.5586
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,FMCG,FMCG,1.0
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,FMCG,IT,0.2948
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,FMCG,METAL,0.4303
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,FMCG,PHARMA,0.3916
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,IT,AUTO,0.3754
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,IT,BANK,0.2535
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,IT,FMCG,0.2948
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,IT,IT,1.0
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,IT,METAL,0.3079
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,IT,PHARMA,0.3375
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,METAL,AUTO,0.7231
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,METAL,BANK,0.6039
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,METAL,FMCG,0.4303
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,METAL,IT,0.3079
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,METAL,METAL,1.0
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,METAL,PHARMA,0.7107
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,PHARMA,AUTO,0.5744
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,PHARMA,BANK,0.456
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,PHARMA,FMCG,0.3916
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,PHARMA,IT,0.3375
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,PHARMA,METAL,0.7107
+hmm,filtered_causal,holdout,5,Correction / Risk-Off Digestion,126,29.86,sufficient,PHARMA,PHARMA,1.0
