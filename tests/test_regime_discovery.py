@@ -11,6 +11,7 @@ Focused verification tests for Phase 6 Regime Discovery:
 import pytest
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from typing import Dict, Any, List
 
 from src.regime_discovery import (
@@ -268,7 +269,10 @@ def test_folds_do_not_leak_into_holdout():
 def test_actual_kmeans_selection_excludes_k3():
     """Verify that on the project's actual kmeans_cv_metrics.csv,
     K=3 is rejected (only 1 valid fold) and K=4 is selected for both scalers."""
-    df = pd.read_csv("results/kmeans_cv_metrics.csv")
+    path = Path("results/phase6_model_selection/kmeans/kmeans_cv_metrics.csv")
+    if not path.exists():
+        path = Path("results/kmeans_cv_metrics.csv")
+    df = pd.read_csv(path)
     k_rob = select_kmeans_k(df, scaler_type="robust")
     k_std = select_kmeans_k(df, scaler_type="standard")
     assert k_rob == 4, f"Expected K=4 for robust scaler, got {k_rob}"
