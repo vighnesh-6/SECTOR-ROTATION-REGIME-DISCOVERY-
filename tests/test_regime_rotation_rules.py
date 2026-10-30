@@ -485,3 +485,147 @@ def test_deterministic_behavior(synthetic_prices):
     sched2 = engine2.generate_schedule(dates=dates, probabilities_df=prob_df, price_df=synthetic_prices)
 
     pd.testing.assert_frame_equal(sched1, sched2)
+
+
+# ---------------------------------------------------------------------------
+# 18. Continuous Probability Precedence Over regime_id
+# ---------------------------------------------------------------------------
+
+def test_continuous_probability_precedence_over_regime_id():
+    """
+    Verify that when both continuous prob_0..prob_5 and regime_id are present,
+    the engine prioritizes the genuine probability distribution over regime_id.
+    """
+    dates = pd.bdate_range("2024-01-01", periods=5)
+    data = []
+    for _ in range(5):
+        # regime_id says 0, but genuine probability strongly indicates R4 (P=0.85)
+        row = {f"prob_{j}": 0.03 for j in range(6)}
+        row["prob_4"] = 0.85
+        row["regime_id"] = 0
+        data.append(row)
+    prob_df = pd.DataFrame(data, index=dates)
+
+    engine = RegimeRotationRulesEngine(variant="1A")
+    sched = engine.generate_schedule(dates=dates, probabilities_df=prob_df)
+
+    # Should allocate to R4 (METAL/AUTO), NOT R0 (IT/METAL)
+    assert sched.iloc[0]["raw_regime_argmax"] == 4
+    assert sched.iloc[0]["accepted_regime"] == 4
+    assert sched.iloc[0]["max_probability"] == 0.85
+    assert sched.iloc[0]["w_METAL"] == 0.50
+    assert sched.iloc[0]["w_AUTO"] == 0.50
+    assert sched.iloc[0]["w_IT"] == 0.0
+
+
+# ---------------------------------------------------------------------------
+# 19. Continuous Probability Confidence Threshold Filtering
+# ---------------------------------------------------------------------------
+
+def test_continuous_probability_confidence_threshold_filtering():
+    """
+    Verify that diffuse continuous probabilities (max P < 0.50) are rejected
+    and the portfolio retains its incumbent allocation.
+    """
+    dates = pd.bdate_range("2024-01-01", periods=6)
+    # Day 0: Confident in R2 (P=0.70)
+    # Days 1..5: Diffuse transition with max P = 0.40 in R0, but no regime >= 0.50
+    data = []
+    # Day 0: confident in R2
+    p0 = {f"prob_{j}": 0.06 for j in range(6)}
+    p0["prob_2"] = 0.70
+    data.append(p0)
+
+    # Days 1..5: diffuse, R0 is leading candidate but only 0.40
+    for _ in range(5):
+        p_diff = {f"prob_{j}": 0.12 for j in range(6)}
+        p_diff["prob_0"] = 0.40
+        data.append(p_diff)
+
+    prob_df = pd.DataFrame(data, index=dates)
+
+    engine = RegimeRotationRulesEngine(variant="1A", min_holding_days=1)
+    sched = engine.generate_schedule(dates=dates, probabilities_df=prob_df)
+
+    # Day 0: enters R2 (IT + PHARMA)
+    assert sched.iloc[0]["accepted_regime"] == 2
+    assert bool(sched.iloc[0]["rebalance_triggered"]) is True
+    assert sched.iloc[0]["w_IT"] == 0.50
+    assert sched.iloc[0]["w_PHARMA"] == 0.50
+
+    # Days 1..5: R0 has max probability (0.40), but 0.40 < 0.50 -> rejected!
+    for i in range(1, 6):
+        assert sched.iloc[i]["raw_regime_argmax"] == 0
+        assert sched.iloc[i]["max_probability"] == 0.40
+        assert bool(sched.iloc[i]["is_confident"]) is False
+        assert sched.iloc[i]["accepted_regime"] == 2  # retains incumbent R2
+        assert bool(sched.iloc[i]["rebalance_triggered"]) is False
+        assert sched.iloc[i]["w_IT"] == 0.50
+        assert sched.iloc[i]["w_PHARMA"] == 0.50
+
+
+# ---------------------------------------------------------------------------
+# 20. Malformed Continuous Probability Vectors Rejected
+# ---------------------------------------------------------------------------
+
+def test_malformed_continuous_probability_vectors_rejected():
+    """Verify that continuous probabilities with NaNs, Infs, or bad sums raise ValueError."""
+    dates = pd.bdate_range("2024-01-01", periods=3)
+
+    # NaN in probabilities
+    bad_nan = pd.DataFrame(
+        [
+            {"prob_0": np.nan, "prob_1": 0.2, "prob_2": 0.2, "prob_3": 0.2, "prob_4": 0.2, "prob_5": 0.2},
+            {"prob_0": 0.2, "prob_1": 0.2, "prob_2": 0.2, "prob_3": 0.2, "prob_4": 0.2, "prob_5": 0.2},
+            {"prob_0": 0.2, "prob_1": 0.2, "prob_2": 0.2, "prob_3": 0.2, "prob_4": 0.2, "prob_5": 0.2},
+        ],
+        index=dates,
+    )
+    engine = RegimeRotationRulesEngine(variant="1A")
+    with pytest.raises(ValueError, match="NaN or Inf"):
+        engine.generate_schedule(dates=dates, probabilities_df=bad_nan)
+
+    # Row sum does not equal 1.0
+    bad_sum = pd.DataFrame(
+        [
+            {"prob_0": 0.1, "prob_1": 0.1, "prob_2": 0.1, "prob_3": 0.1, "prob_4": 0.1, "prob_5": 0.1},
+        ] * 3,
+        index=dates,
+    )
+    with pytest.raises(ValueError, match="sum to ~1.0"):
+        engine.generate_schedule(dates=dates, probabilities_df=bad_sum)
+
+
+# ---------------------------------------------------------------------------
+# 21. End-to-End Recovery File Ingestion on Actual hmm_causal_probabilities.csv
+# ---------------------------------------------------------------------------
+
+def test_recovered_hmm_causal_probabilities_file_ingestion(synthetic_prices):
+    """
+    Verify that results/regime_discovery/hmm_causal_probabilities.csv can be loaded
+    directly into RegimeRotationRulesEngine across all 4 strategy variants.
+    """
+    prob_path = Path("results/regime_discovery/hmm_causal_probabilities.csv")
+    if not prob_path.exists():
+        pytest.skip("hmm_causal_probabilities.csv not present.")
+
+    prob_df = pd.read_csv(prob_path, parse_dates=["Date"]).set_index("Date")
+    # Intersect with synthetic prices date range (2024)
+    common_dates = [d for d in synthetic_prices.index if d in prob_df.index][:25]
+    assert len(common_dates) > 0, "No common dates between synthetic_prices and hmm_causal_probabilities."
+
+    test_dates = pd.DatetimeIndex(common_dates)
+
+    for v in ["1A", "1B", "2A", "2B"]:
+        engine = RegimeRotationRulesEngine(variant=v)
+        sched = engine.generate_schedule(
+            dates=test_dates,
+            probabilities_df=prob_df,
+            price_df=synthetic_prices if "1B" in v or "2B" in v else None,
+        )
+        assert len(sched) == len(test_dates)
+        assert "is_confident" in sched.columns
+        for _, row in sched.iterrows():
+            w_dict = {asset: row[f"w_{asset}"] for asset in ALL_ASSETS}
+            validate_portfolio_weights(w_dict)
+
