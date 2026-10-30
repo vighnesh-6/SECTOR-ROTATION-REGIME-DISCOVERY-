@@ -617,6 +617,27 @@ class RegimeRotationRulesEngine:
         if self.variant.is_inverse_vol and price_df is None:
             raise ValueError(f"Variant '{self.variant.value}' requires price_df for volatility calculation.")
 
+        # Determine probability column structure prior to the session loop.
+        # Genuine continuous probability columns take strict precedence over discrete 'regime_id'.
+        prob_cols: Optional[List[Any]] = None
+        candidate_col_formats = [
+            [f"prob_{j}" for j in range(6)],
+            [f"regime_{j}" for j in range(6)],
+            [0, 1, 2, 3, 4, 5],
+            [str(j) for j in range(6)],
+        ]
+        for candidate in candidate_col_formats:
+            if all(c in probabilities_df.columns for c in candidate):
+                prob_cols = candidate
+                break
+
+        has_regime_id = "regime_id" in probabilities_df.columns
+        if prob_cols is None and not has_regime_id:
+            raise KeyError(
+                "probabilities_df must contain continuous probability columns "
+                "('prob_0'..'prob_5', 'regime_0'..'regime_5', 0..5) or 'regime_id'."
+            )
+
         # State tracking
         current_weights = create_nifty50_initial_weights()
         incumbent_regime: Optional[int] = None
@@ -635,14 +656,19 @@ class RegimeRotationRulesEngine:
                 raise KeyError(f"Date {current_date} missing from probabilities_df.")
 
             row = probabilities_df.loc[current_date]
-            if "regime_id" in probabilities_df.columns:
+            if isinstance(row, pd.DataFrame):
+                row = row.iloc[0]
+
+            if prob_cols is not None:
+                # Genuine continuous probability columns take precedence
+                p_vec = row[prob_cols].values.astype(float)
+            else:
+                # Discrete label fallback (one-hot vector)
                 r_id = int(row["regime_id"])
+                if r_id < 0 or r_id > 5:
+                    raise ValueError(f"Invalid regime_id: {r_id}. Expected integer in [0..5].")
                 p_vec = np.zeros(6, dtype=float)
                 p_vec[r_id] = 1.0
-            else:
-                # Expect 6 numeric columns
-                col_keys = [0, 1, 2, 3, 4, 5] if 0 in probabilities_df.columns else [f"regime_{j}" for j in range(6)]
-                p_vec = row[col_keys].values.astype(float)
 
             raw_argmax = int(np.argmax(p_vec))
 
