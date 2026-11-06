@@ -24,8 +24,8 @@ In strict compliance with user instructions and project governance:
 
 | Deliverable Name | File Path | File Size | Page Count | Primary Content & Structure |
 |---|---|---:|---:|---|
-| **Deliverable 1: Complete Research Report** | `reports/final_report/final_project_research_report.pdf` | 2,631,323 bytes (2,569.7 KB) | 14 Pages | 20 Required Academic Chapters + Executive Summary + Appendices A, B, C; 7 Figures embedded; 5 Structured Verified Numerical Tables. |
-| **Deliverable 2: Project Architecture Document** | `reports/final_report/final_project_architecture.pdf` | 685,368 bytes (669.3 KB) | 9 Pages | 13 Required Technical Architectural Sections + Executive Architecture Overview; 10 Structured Vector Architectural Flowchart Cards; Validation Flowchart embedded. |
+| **Deliverable 1: Complete Research Report** | `reports/final_report/final_project_research_report.pdf` | 2,632,514 bytes (2,570.8 KB) | 14 Pages | 20 Required Academic Chapters + Executive Summary + Appendices A, B, C; 7 Figures embedded; 5 Structured Verified Numerical Tables. |
+| **Deliverable 2: Project Architecture Document** | `reports/final_report/final_project_architecture.pdf` | 687,785 bytes (671.7 KB) | 9 Pages | 13 Required Technical Architectural Sections + Executive Architecture Overview; 10 Structured Vector Architectural Flowchart Cards; Validation Flowchart embedded. |
 | **Completion Record** | `reports/final_report/phase14_documentation_completion.md` | ~12 KB | Markdown | Implementation audit, file verification, checksum audit, test regression results, and final sign-off verdict. |
 
 ---
@@ -137,6 +137,22 @@ Both PDF monographs have been verified against the canonical empirical ground tr
 - Episode duration medians: Full Sample = **18.5 days** (Mean = 27.19d across 62 episodes); R0: 16.0d, R1: 40.0d, R2: 19.0d, R3: 27.0d, R4: 17.5d, R5: 19.0d.
 - COVID sequence R5 $\to$ R3 $\to$ R1 $\to$ R0 explicitly documented as a single historical observation ($N=1$), not an immutable universal law.
 - **Audit Verdict:** **CONFIRMED & PRESERVED**.
+
+### 4.6 Strategy Matrix & Event-Driven Rebalancing Logic Parity
+- **Source of Truth:** Verified against authoritative Python implementations in `src/regime_rotation_rules.py` (lines 15–40, 78–105, 202–267, 319–375, 424–492, 562–760) and `src/portfolio_construction.py` (lines 6–17, 305–403).
+- **Strategy Matrix (2 x 2 Design):** All references to daily/weekly rebalancing frequencies have been replaced with the verified definitions:
+  - **Strategy 1A:** Template A (100% Fully Invested Equity, 0% Cash across all regimes) + Equal-Weighted Top-2 candidate sectors (50% / 50%).
+  - **Strategy 1B:** Template A (100% Fully Invested Equity, 0% Cash across all regimes) + Inverse-Volatility Top-2 candidate sectors ($w_i \propto 1 / \sigma_{i, 20d}$, with volatility floor $10^{-4}$).
+  - **Strategy 2A:** Template B (Defensive Cash Floors: R0: 0%, R1: 30%, R2: 0%, R3: 40%, R4: 0%, R5: 20%) + Equal-Weighted Top-2 candidate sectors net of cash (with R3 agreed asymmetric split: 40% PHARMA, 20% FMCG, 40% Cash).
+  - **Strategy 2B:** Template B (Defensive Cash Floors: R0: 0%, R1: 30%, R2: 0%, R3: 40%, R4: 0%, R5: 20%) + Inverse-Volatility Top-2 candidate sectors net of cash (in R3: 40% Cash, 60% equity split between PHARMA and FMCG inversely proportional to volatility).
+- **Event-Driven Rebalancing Mechanism:**
+  - **Confidence Acceptance Threshold ($P \ge 0.50$):** Signals evaluated daily at Date $t$ Close using causal forward-filtered probabilities $P(S_t = k | y_{1:t})$. If $\max_k P(S_t = k) \ge 0.50$, the state change is accepted; otherwise the incumbent regime persists (`is_confident = False`).
+  - **Minimum Holding Lockup (5 Trading Days):** Elective transitions require `holding_days >= 5` to prevent whipsaw turnover.
+  - **Regime 3 Crisis Override Exception:** Upon detecting Regime 3 (Acute Crash) with $\ge 50\%$ confidence, the 5-day lockup is immediately bypassed (`rebalance_bypassed_r3 = True`), prioritizing capital preservation while executing at Date $t+1$ Close.
+  - **Execution Timing ($t+1$ Close):** Signals generated at Date $t$ Close execute strictly at Date $t+1$ Close. Intraday price drift modifies weights between rebalances: $w_{i, t}^{drift} = w_{i, t-1} \frac{1 + r_{i, t}}{1 + r_{p, t}}$.
+  - **Turnover & Cost Friction:** Turnover is computed on actual drift: $TO_t = 0.5 \sum |w_{i, t} - w_{i, t}^{drift}|$. Transaction costs are flat 15 bps (0.0015) per unit of turnover.
+  - **Rebalance Count Verification:** Exactly **38 rebalances** executed in training, **20 rebalances** in holdout, and **58 rebalances** across the complete 1,686 simulation intervals across all 4 strategy variants (verified against `results/portfolio_backtest/metrics_summary.parquet`).
+- **Audit Verdict:** **CONFIRMED & 100% PARITY WITH SOURCE CODE**.
 
 ---
 
