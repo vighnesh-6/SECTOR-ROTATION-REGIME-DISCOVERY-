@@ -1,50 +1,42 @@
-# Phase 10.6 — Read-Only Methodology & Feasibility Audit Report
+# Phase 10.6 — Read-Only Methodology & Feasibility Audit Report (Final Revision)
 
 **Project:** Machine-Learning-Based Sector Rotation Regime Discovery in the Indian Equity Market  
 **Phase:** 10.6 — Robustness Testing  
-**Audit Type:** Strictly Read-Only Architectural & Methodological Feasibility Audit  
+**Audit Type:** Strictly Read-Only Architectural & Methodological Feasibility Audit (Final Approved Revision)  
 **Date of Audit:** November 5, 2026  
 **Auditor Mode:** Autonomous Lead Quantitative Auditor (Read-Only)  
-**Deliverable Status:** COMPLETE — PENDING USER APPROVAL PRIOR TO IMPLEMENTATION  
+**Deliverable Status:** COMPLETE & FINALIZED — AWAITING FINAL IMPLEMENTATION GO-AHEAD  
 
 ---
 
-## 1. Executive Summary
+## 1. Executive Summary & Approved Scope
 
-Phase 10.6 addresses the vital question: **Do the conclusions and performance of our existing portfolio strategies remain reliable under reasonable changes in assumptions, operational frictions, and market conditions?**
+Phase 10.6 addresses the central question: **Do the conclusions and performance of our existing portfolio strategies remain reliable under reasonable changes in assumptions, operational frictions, execution delays, and market environments?**
 
-This audit report delivers an exhaustive, read-only architectural inspection of the codebase, existing artifacts, historical datasets, and quantitative engines. It formally evaluates the feasibility, methodology, dependencies, risks, and appropriate testing scope for all **seven proposed robustness investigations**:
+Following two rounds of rigorous read-only methodology reviews, the overall framework has been approved in principle:
+1. **Tiered Evaluation Scope:**
+   - **Investigations 1–5 and 7:** Evaluated across **all four canonical strategies (1A, 1B, 2A, 2B)**.
+   - **Investigation 6:** Evaluated using **Strategy 1A as the Primary Reference Strategy** across an exhaustive 42-cell parameter grid, supplemented by predefined extreme boundary cross-checks on Variants 1B, 2A, and 2B.
+2. **Additional Active Comparator:** Approved the inclusion of a **Naive Top-2 Cross-Sectional Momentum Benchmark** (monthly rebalanced, 50/50 equal weighting, 15 bps fee) to isolate whether HMM regime discovery adds structural value over pure price momentum, while maintaining **NIFTY 50 as the primary benchmark**.
+3. **Structured Outputs:** All tabular outputs will be exported in **Apache Parquet format** under `results/portfolio_backtest/robustness/`.
+4. **Research Integrity:** Training and previously examined holdout results will be strictly segregated. The holdout is explicitly designated as a **previously examined out-of-sample stress test**, not a fresh untouched test set.
 
-1. **Investigation 1 — Transaction Cost Sensitivity (0 to 30 bps):** **Fully Feasible.**
-2. **Investigation 2 — Execution Sensitivity ($t+1$, $t+2$, $t$ Close, Open):** **Feasible with Limitations** (discrete daily session boundaries supported; continuous intraday slippage/VWAP unsupported by daily OHLCV data).
-3. **Investigation 3 — Portfolio Concentration Sensitivity (HHI, $N_{\text{eff}}$, Risk):** **Fully Feasible.**
-4. **Investigation 4 — Subperiod Stability (Calendar years, Bull/Bear, VIX):** **Fully Feasible.**
-5. **Investigation 5 — Regime Stability (Performance by HMM state & transitions):** **Fully Feasible.**
-6. **Investigation 6 — Parameter and Model Sensitivity ($P_{\text{thresh}}$, $T_{\text{lock}}$, Lookback):** **Feasible with Limitations** (rule-level execution thresholds fully testable from existing causal probabilities; HMM retraining/respecification strictly prohibited).
-7. **Investigation 7 — Benchmark Sensitivity (Dual-Beta, Capture Ratios, Momentum):** **Fully Feasible.**
-
-### Core Scope Recommendation:
-We recommend a **Tiered Scope Architecture**:
-- **Investigations 1, 2, 3, 4, 5, and 7** are evaluated across **all four canonical strategies (1A, 1B, 2A, 2B)** to preserve the integrity of the 2x2 experimental matrix (Fully Invested vs. Cash Toggle $\times$ Equal-Weight vs. Inverse-Volatility). Vectorized backtest execution consumes $< 0.05$ seconds per strategy, making computational overhead negligible.
-- **Investigation 6 (Multi-Dimensional Parameter Grid)** conducts its exhaustive two-dimensional parameter sweeps ($P_{\text{thresh}} \times T_{\text{lock}}$) using **Strategy 1A as the Primary Reference Strategy**, accompanied by boundary-point cross-validation on 1B, 2A, and 2B.
-
-**Strict Governance Confirmation:**  
-Zero source files, notebooks, models, canonical schedules, backtests, or evaluation artifacts were modified during this audit. Implementation remains strictly blocked pending user review and formal approval.
+This final revision resolves all remaining empirical and methodological details regarding calendar-year session accounting, historical warm-up initialization, parameter grid boundaries, and naive momentum allocations.
 
 ---
 
-## 2. Existing Architecture and Artifact Audit
+## 2. Existing Architecture & Artifact Audit
 
 ### 2.1 Codebase Structure
 The quantitative pipeline is organized modularly in `src/`:
-* [`src/portfolio_backtest.py`](file:///c:/Users/vighn/OneDrive/Desktop/sector%20rotation%20regime%20discovery/src/portfolio_backtest.py): Implements drift-adjusted actual turnover $TO_{\text{actual}} = 0.5 \sum |w_{\text{target}} - w_{\text{drift}}|$, 15 bps fee deduction at $t+1$ close, pre-trade drift accounting, cash yield compounding, and additive daily attribution.
+* [`src/portfolio_backtest.py`](file:///c:/Users/vighn/OneDrive/Desktop/sector%20rotation%20regime%20discovery/src/portfolio_backtest.py): Implements multi-asset price drift, actual one-way turnover $TO_{\text{actual}} = 0.5 \sum |w_{\text{target}} - w_{\text{drift}}|$, 15 bps fee deduction at $t+1$ close, cash yield compounding, and additive daily return attribution.
 * [`src/benchmark_backtest.py`](file:///c:/Users/vighn/OneDrive/Desktop/sector%20rotation%20regime%20discovery/src/benchmark_backtest.py): Implements NIFTY 50 Buy & Hold (0 bps) and Equal-Weight Six-Sector Monthly Rebalanced (15 bps).
-* [`src/comparative_evaluation.py`](file:///c:/Users/vighn/OneDrive/Desktop/sector%20rotation%20regime%20discovery/src/comparative_evaluation.py): Implements 18-row primary metrics table, 24-row relative performance matrix (OLS regression, tracking error, information ratio, drawdown rebasing).
+* [`src/comparative_evaluation.py`](file:///c:/Users/vighn/OneDrive/Desktop/sector%20rotation%20regime%20discovery/src/comparative_evaluation.py): Implements 18-row primary metrics table, 24-row relative performance matrix (single-factor OLS regression, tracking error, information ratio, drawdown rebasing).
 * [`src/regime_rotation_rules.py`](file:///c:/Users/vighn/OneDrive/Desktop/sector%20rotation%20regime%20discovery/src/regime_rotation_rules.py): Implements `RegimeRotationRulesEngine`, holding lockup ($T=5$), confidence threshold ($P=0.50$), Template A vs. B cash allocations, and 20-day inverse-volatility sizing.
 
 ### 2.2 Canonical Input and Result Artifacts
 * **Schedules:** `results/portfolio_construction/target_weights_{1A, 1B, 2A, 2B}.csv` (1,687 daily sessions).
-* **Simulation Records:** `results/portfolio_backtest/daily_simulation_{1A, 1B, 2A, 2B}.parquet` and benchmark parquets (1,686 daily intervals).
+* **Simulation Records:** `results/portfolio_backtest/daily_simulation_{1A, 1B, 2A, 2B}.parquet` and benchmark parquets (1,686 daily return intervals).
 * **Causal Probabilities:** `results/regime_discovery/hmm_causal_probabilities.csv` (1,687 sessions $\times$ 6 states).
 * **Market Prices:** `data/processed/aligned/` contains `Date, Adj Close, Close, High, Low, Open, Volume` for NIFTY 50, all 6 sectors (Auto, Bank, FMCG, IT, Metal, Pharma), and `india_vix_aligned.csv`.
 
@@ -57,537 +49,297 @@ The quantitative pipeline is organized modularly in `src/`:
 | **1** | **Transaction Cost Sensitivity** | **Fully Feasible** | `simulate_portfolio` directly accepts `cost_rate`. Actual turnover is invariant to cost rate. Net returns compound cleanly without altering target weights. |
 | **2** | **Execution Sensitivity** | **Feasible with Limitations** | Discrete session boundaries ($t+1$ Close, $t+2$ Close delay, $t$ Close zero-latency, $t+1$ Open) are fully feasible. Intraday VWAP/TWAP and dynamic order book slippage are **not supported** by daily OHLCV data. |
 | **3** | **Portfolio Concentration** | **Fully Feasible** | Target weights, holding weights, and asset return contributions exist for all 1,686 sessions in canonical simulation parquets. HHI, $N_{\text{eff}}$, and risk contributions can be computed analytically. |
-| **4** | **Subperiod Stability** | **Fully Feasible** | Objective partitions (calendar years, NIFTY 50 200-day SMA bull/bear regimes, and India VIX volatility regimes) can be applied directly to the daily return series. |
+| **4** | **Subperiod Stability** | **Fully Feasible** | Objective partitions (calendar years, causal NIFTY 50 200-day SMA bull/bear regimes, and pre-holdout India VIX volatility regimes) can be applied directly. |
 | **5** | **Regime Stability** | **Fully Feasible** | Causal state assignments (`accepted_regime`, `is_confident`, `prob_0`–`prob_5`) and daily net returns are already co-located in daily simulation parquets. |
 | **6** | **Parameter & Model Sensitivity** | **Feasible with Limitations** | Execution parameters ($P_{\text{thresh}} \in [0.4, 0.7]$, $T_{\text{lock}} \in [1, 20]$, $L_{\text{vol}} \in [10, 40]$) can be re-run on frozen causal probabilities. HMM retraining or re-estimation is strictly prohibited. |
 | **7** | **Benchmark Sensitivity** | **Fully Feasible** | Existing NIFTY 50 and Equal-Weight series are available. Additional benchmarks (e.g., Naive Momentum Top-2, Buy-and-Hold 6-Sector) and Dual-Beta / market timing regressions are fully computable. |
 
 ---
 
-## 4. Detailed Proposed Methodology for Each Investigation
+## 4. Methodological Clarifications & Detailed Specifications
 
-### Investigation 1 — Transaction Cost Sensitivity
+### Investigation 1 — Transaction Cost Sensitivity & Turnover Accounting
 
-#### 1. Research Objective
-Quantify the erosion of strategy net returns under varying brokerage, statutory, and market impact friction. Determine the **breakeven transaction cost rate** at which:
-1. Strategy Net CAGR drops to 0.00%.
-2. Strategy Net CAGR falls below the passive NIFTY 50 benchmark.
-3. Strategy Net CAGR falls below the Equal-Weight Six-Sector benchmark.
+#### 1. Precise Turnover Formulation
+Actual one-way portfolio turnover on rebalance session $t$ is calculated against pre-trade drifted weights:
+$$TO_{\text{one-way}, t} = 0.5 \sum_{i=1}^K |w_{\text{target}, i, t} - w_{\text{drift}, i, t}|$$
+where pre-trade drifted weights $w_{\text{drift}, i, t}$ reflect asset price movements since the prior session:
+$$w_{\text{drift}, i, t} = \frac{w_{\text{hold}, i, t-1} (1 + r_{i, t})}{\sum_{j=1}^K w_{\text{hold}, j, t-1} (1 + r_{j, t})}$$
 
-#### 2. Exact Methodology
-* **Evaluation Grid:** $\text{cost\_rate} \in \{0, 5, 10, 15 \text{ [baseline]}, 20, 25, 30 \text{ bps}\}$ (i.e., `[0.0000, 0.0005, 0.0010, 0.0015, 0.0020, 0.0025, 0.0030]`).
-* **Turnover Mechanics:** Actual one-way turnover on rebalance date $t$ is:
-  $$TO_{\text{actual}, t} = 0.5 \sum_{i=1}^K |w_{\text{target}, i, t} - w_{\text{drift}, i, t}|$$
-  Because $w_{\text{target}}$ is frozen from Phase 9 and $w_{\text{drift}}$ depends strictly on pre-trade asset returns, $TO_{\text{actual}, t}$ is mathematically invariant to the cost rate.
-* **Accounting & Compounding:**
-  $$TC_t = \text{NAV}_{\text{pre}, t} \times TO_{\text{actual}, t} \times \text{cost\_rate}$$
-  $$\text{NAV}_{\text{post}, t} = \text{NAV}_{\text{pre}, t} - TC_t$$
-  Net returns compound continuously across the 1,686 return intervals.
-* **Periods Evaluated:** Training (1,264 intervals), Holdout (422 intervals), Full Cycle (1,686 intervals).
+#### 2. Institutional Cost Definition (One-Way vs. Two-Way Notional)
+* In institutional portfolio management, one-way turnover measures the fraction of portfolio equity bought (or sold). In any rebalance where starting and ending cash flows are zero, the total value of purchases equals the total value of sales:
+  $$\sum_{i: \Delta w_i > 0} \Delta w_i = \sum_{i: \Delta w_i < 0} |\Delta w_i| = TO_{\text{one-way}}$$
+* The total two-way traded volume (purchases + sales) is therefore:
+  $$\text{Volume}_{\text{two-way}} = \sum_{i=1}^K |\Delta w_i| = 2 \times TO_{\text{one-way}}$$
+* **Fee Application in Engine:**
+  $$TC_t = \text{NAV}_{\text{pre}, t} \times TO_{\text{one-way}, t} \times \text{cost\_rate}$$
+  With $\text{cost\_rate} = 0.0015$ (15 bps baseline), the portfolio pays **15 bps per unit of one-way turnover**.
+* **Equivalence:** This is mathematically identical to charging **7.5 bps on total gross traded notional (both buys and sells)** ($0.00075 \times 2 \times TO_{\text{one-way}} = 0.0015 \times TO_{\text{one-way}}$), or 15 bps round-trip on every rupee shifted from an old sector into a new sector.
+* **Verification of Non-Duplication and Non-Omission:**
+  - Transaction costs are deducted *strictly once* per rebalance event, directly from pre-trade net NAV: $\text{NAV}_{\text{post}} = \text{NAV}_{\text{pre}} - TC$.
+  - On non-rebalance sessions, $TO_{\text{actual}} = 0$ and $TC = 0$.
+  - There is zero double-counting, and no transaction friction is omitted.
 
-#### 3. Required Input Artifacts
-* `results/portfolio_construction/target_weights_{variant}.csv`
-* `data/processed/aligned/` (aligned sector and NIFTY 50 closing prices)
+#### 3. Parameter Evaluation Grid
+$$\text{cost\_rate} \in \{0, 5, 10, 15 \text{ [baseline]}, 20, 25, 30 \text{ bps}\} \equiv \{0.0000, 0.0005, 0.0010, 0.0015, 0.0020, 0.0025, 0.0030\}$$
+Because $w_{\text{target}}$ and $w_{\text{drift}}$ are scale-invariant normalized weights, $TO_{\text{actual}, t}$ is mathematically invariant to the cost rate. Only cash costs and resulting compounding NAV series vary.
 
-#### 4. Existing Implementation Dependencies
-* `simulate_portfolio()` and `compute_metrics()` in `src/portfolio_backtest.py`.
-
-#### 5. Required Calculations and Metrics
-* Total Gross Return, Total Net Return, Net CAGR, CAGR Cost Drag ($\text{CAGR}_{\text{gross}} - \text{CAGR}_{\text{net}}$).
-* Annualized Volatility, Sharpe Ratio ($\text{RF}=0\%$), Sortino Ratio ($\text{MAR}=0\%$), Maximum Drawdown.
-* Cumulative cash transaction costs paid per ₹1 starting capital.
-* Breakeven cost rates solved via linear interpolation across the evaluation grid.
-
-#### 6. Feasibility with Existing Data
-**Fully Feasible.**
-
-#### 7. Potential Look-Ahead or Methodological Risks
-**Zero risk.** Canonical target weights and prices remain untouched.
-
-#### 8. Target Strategy Scope
-**All 4 canonical strategies (1A, 1B, 2A, 2B).**  
-*Rationale:* Testing all 4 reveals whether the cash toggle (Variants 2A/2B) provides better cost insulation under high turnover than 100% equity variants (1A/1B).
-
-#### 9. Expected Parquet Output
-`results/portfolio_backtest/robustness/cost_sensitivity.parquet`  
-*Schema (84 rows: 4 strategies $\times$ 7 cost levels $\times$ 3 periods):*  
-`strategy`, `period`, `cost_bps`, `sample_count`, `net_total_return`, `net_cagr`, `cost_drag`, `annualized_vol`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown`, `cash_costs_paid`, `actual_turnover_annualized`.
-
-#### 10. Required Validation and Reproducibility Tests
-* Verify that at $\text{cost\_rate} = 15 \text{ bps}$, output metrics match canonical Phase 10.5 metrics to $< 10^{-12}$.
-* Verify that at $\text{cost\_rate} = 0 \text{ bps}$, Net metrics equal Gross metrics exactly.
-* Verify monotonic decay: Net CAGR must strictly decrease as `cost_bps` increases.
+#### 4. Breakeven Analysis
+Solve for the critical cost rate $\text{cost\_rate}^*$ where:
+1. $\text{Net CAGR}(\text{cost\_rate}^*) = 0.00\%$ (Capital Preservation Breakeven).
+2. $\text{Net CAGR}(\text{cost\_rate}^*) = \text{CAGR}(\text{NIFTY 50})$ (Alpha Breakeven vs. Primary Benchmark).
+3. $\text{Net CAGR}(\text{cost\_rate}^*) = \text{CAGR}(\text{Equal-Weight 6S})$ (Alpha Breakeven vs. Sector Benchmark).
 
 ---
 
-### Investigation 2 — Execution Sensitivity
+### Investigation 2 — Execution Sensitivity & Market Microstructure Boundaries
 
-#### 1. Research Objective
-Assess how sensitive the strategy's profitability is to execution timing, and quantify the drag caused by the operational delay between signal generation and trade execution.
+#### 1. Existing Phase 10 Baseline Execution Verification
+In [`src/portfolio_backtest.py`](file:///c:/Users/vighn/OneDrive/Desktop/sector%20rotation%20regime%20discovery/src/portfolio_backtest.py), the baseline execution timing is strictly **$t+1$ Close**:
+* **Signal Generation Timestamp:** Session $t$ Market Close (15:30 IST), using feature data and causal HMM filter probabilities up to session $t$.
+* **Rebalance Execution Timestamp:** Session $t+1$ Market Close (15:30 IST), at closing price $P_{t+1}$.
+* **Holding Mechanics:** Between session $t$ Close and session $t+1$ Close, the portfolio holds the incumbent drifted weights $w_{\text{drift}, t+1}$, earning the return of the incumbent portfolio. The new target weights take effect from session $t+1$ close onward. This represents a full 1-trading-day execution delay.
 
-#### 2. Exact Methodology
-Evaluate four discrete execution models:
-1. **Model A (Canonical Baseline — $t+1$ Close):** Signal generated at date $t$ Close; trades execute at date $t+1$ Close at price $P_{t+1}$. (1 session execution latency).
-2. **Model B (Operational Delay — $t+2$ Close):** Signal generated at date $t$ Close; execution is delayed by an additional trading day, executing at date $t+2$ Close at price $P_{t+2}$. (Tests severe broker/settlement friction).
-3. **Model C (Zero-Latency Diagnostic Ceiling — $t$ Close):** Signal generated at date $t$ Close executes at date $t$ Close at price $P_t$. (Hypothetical upper bound; measures the exact cost of the 1-session delay).
-4. **Model D (Next-Day Open — $t+1$ Open):** Signal generated at date $t$ Close executes at date $t+1$ Open at price $P_{\text{open}, t+1}$.
+#### 2. Signal Timestamp and Realistically Executable Prices
+* In live market conditions, signals calculated after market close on session $t$ (15:30 IST) can be executed at the earliest during the **next session's opening auction (Session $t+1$ Open, 09:15 IST)**, or via **Session $t+1$ Market-on-Close (15:30 IST)**.
+* **Session $t$ Close is a Theoretical Zero-Latency Bound:** Executing at the same close as signal generation ($t$ Close) is physically impossible in live trading because closing prices must be finalized before the HMM filter can run. It is evaluated strictly as a diagnostic upper bound to isolate the exact cost of the 1-session delay.
 
-#### 3. Required Input Artifacts
-* `results/portfolio_construction/target_weights_{variant}.csv`
-* `data/processed/aligned/` (Open, High, Low, Close prices)
+#### 3. Execution Models with Full Drift and Turnover Tracking
+**Do NOT simply shift return series.** Every model simulates state continuity, holdings drift, and actual turnover:
 
-#### 4. Existing Implementation Dependencies
-* Schedule alignment logic and `simulate_portfolio()` in `src/portfolio_backtest.py`.
+1. **Model A (Canonical Baseline — $t+1$ Close):**
+   Signal at session $t$ Close. Holdings drift through session $t+1$. Trade executes at session $t+1$ Close at price $P_{\text{close}, t+1}$. Turnover $TO = 0.5 \sum |w_{\text{target}} - w_{\text{drift}, t+1}|$. Target weights hold over session $t+1 \to t+2$.
+2. **Model B (Operational Delay — $t+2$ Close):**
+   Signal at session $t$ Close. Due to operational or broker delays, execution is postponed by an additional session. Holdings drift through sessions $t+1$ and $t+2$. Trade executes at session $t+2$ Close at price $P_{\text{close}, t+2}$. Turnover $TO = 0.5 \sum |w_{\text{target}} - w_{\text{drift}, t+2}|$. Target weights hold over session $t+2 \to t+3$.
+3. **Model C (Zero-Latency Diagnostic Bound — $t$ Close):**
+   Signal at session $t$ Close. Hypothetical instantaneous rebalance at session $t$ Close from $w_{\text{drift}, t}$ to $w_{\text{target}}$. Target weights hold over session $t \to t+1$. Measures the "latency penalty" ($t$ Close return minus $t+1$ Close return).
+4. **Model D (Next-Day Open — $t+1$ Open):**
+   Signal at session $t$ Close. On session $t+1$, the portfolio earns the overnight gap return on drifted holdings:
+   $$r_{\text{gap}, t+1} = \sum_{i=1}^K w_{\text{hold}, i, t} \times \left(\frac{P_{\text{open}, i, t+1}}{P_{\text{close}, i, t}} - 1\right)$$
+   At session $t+1$ Open (09:15 IST), the portfolio rebalances to $w_{\text{target}}$, paying transaction fees on $TO_{\text{open}} = 0.5 \sum |w_{\text{target}} - w_{\text{drift, open}}|$. Over the intraday session ($t+1$ Open $\to t+1$ Close), target holdings earn:
+   $$r_{\text{day}, t+1} = \sum_{i=1}^K w_{\text{target}, i} \times \left(\frac{P_{\text{close}, i, t+1}}{P_{\text{open}, i, t+1}} - 1\right)$$
+   Total session net return compounds the overnight and intraday legs with transaction fee deduction.
 
-#### 5. Required Calculations and Metrics
-* Net Total Return, Net CAGR, Sharpe Ratio, Maximum Drawdown, Active Return vs. NIFTY 50.
-* **Execution Timing Drag:** $\Delta \text{CAGR} = \text{CAGR}(t \text{ Close}) - \text{CAGR}(t+1 \text{ Close})$.
-* **Operational Delay Penalty:** $\Delta \text{CAGR}_{\text{delay}} = \text{CAGR}(t+1 \text{ Close}) - \text{CAGR}(t+2 \text{ Close})$.
-
-#### 6. Feasibility with Existing Data
-**Feasible with Limitations.**  
-*Explicit Limitations:*  
-- Daily OHLCV data supports discrete session-boundary execution (Close-to-Close and Open-to-Close).
-- Daily data **cannot** model intraday VWAP, TWAP, market order queue position, or opening auction spread widening.
-- Model D ($t+1$ Open) requires separating the daily return into overnight gap ($P_{t, \text{close}} \to P_{t+1, \text{open}}$) and intraday holding ($P_{t+1, \text{open}} \to P_{t+1, \text{close}}$).
-
-#### 7. Potential Look-Ahead or Methodological Risks
-- When simulating Model B ($t+2$ Close), the engine must ensure that subsequent signals occurring on day $t+1$ do not collide or overwrite pending execution without explicit queue handling.
-- Model C ($t$ Close) is strictly diagnostic and must be clearly labeled as non-executable in live trading.
-
-#### 8. Target Strategy Scope
-**All 4 canonical strategies (1A, 1B, 2A, 2B).**
-
-#### 9. Expected Parquet Output
-`results/portfolio_backtest/robustness/execution_sensitivity.parquet`  
-*Schema (48 rows: 4 strategies $\times$ 4 execution models $\times$ 3 periods):*  
-`strategy`, `period`, `execution_model`, `sample_count`, `net_total_return`, `net_cagr`, `sharpe_ratio`, `max_drawdown`, `turnover_annualized`, `timing_drag_vs_t0`, `delay_penalty_vs_t1`.
-
-#### 10. Required Validation and Reproducibility Tests
-* Reconcile Model A ($t+1$ Close) against canonical Phase 10.5 daily NAVs bit-for-bit.
-* Ensure simplex condition $\sum w_i = 1.0$ holds across all shifted execution intervals.
+#### 4. Explicit Microstructure Limitations of Daily OHLCV Data
+Daily OHLCV bars cannot model:
+- Continuous intraday trade matching or queue position in the limit order book.
+- Intraday Volume-Weighted Average Price (VWAP) or Time-Weighted Average Price (TWAP) schedules.
+- Bid-ask spread bounce or market impact curves (e.g. square-root law).
+- Opening auction price dispersion or illiquidity.
+*Conclusion:* Intraday continuous execution simulation is formally documented as outside the scope of Phase 10.6. Execution testing is strictly bounded to discrete session boundaries ($t+1$ Close, $t+2$ Close, $t$ Close, $t+1$ Open).
 
 ---
 
-### Investigation 3 — Portfolio Concentration Sensitivity
+### Investigation 3 — Portfolio Concentration, Risk Attribution & Cash Treatment
 
-#### 1. Research Objective
-Quantify sectoral concentration, exposure dispersion, and risk contribution across time to evaluate whether the strategy's returns are excessively concentrated in a single sector.
+#### 1. Return Contribution vs. Risk Contribution
+* **Sector Return Contribution (Additive):**
+  $$\text{contrib}_{i, t} = w_{\text{hold}, i, t} \times r_{i, t}$$
+  Linear identity: $\sum_{i=1}^K \text{contrib}_{i, t} + c_{\text{cost}, t} = r_{\text{net}, t}$.
+* **Sector Risk Contribution (Marginal Contribution to Risk / Component Volatility):**
+  Let $\mathbf{w}_t$ be the portfolio weight vector and $\mathbf{\Sigma}_t$ be the trailing 60-day asset return covariance matrix.
+  - Portfolio Volatility: $\sigma_p = \sqrt{\mathbf{w}_t^T \mathbf{\Sigma}_t \mathbf{w}_t}$.
+  - Marginal Contribution to Risk (MCR): $\text{MCR}_i = \frac{(\mathbf{\Sigma}_t \mathbf{w}_t)_i}{\sigma_p}$.
+  - Absolute Risk Contribution (Component Volatility): $\text{RC}_i = w_{i, t} \times \text{MCR}_i = w_{i, t} \frac{(\mathbf{\Sigma}_t \mathbf{w}_t)_i}{\sigma_p}$.
+  - Euler's Theorem Decomposition: $\sum_{i=1}^K \text{RC}_i = \sigma_p$.
+  - Percentage Risk Contribution: $\% \text{RC}_i = \frac{\text{RC}_i}{\sigma_p} = \frac{w_{i, t} (\mathbf{\Sigma}_t \mathbf{w}_t)_i}{\mathbf{w}_t^T \mathbf{\Sigma}_t \mathbf{w}_t}$, with $\sum_{i=1}^K \% \text{RC}_i = 100\%$.
 
-#### 2. Exact Methodology
-Using existing daily holding weights $w_{\text{hold}, i, t}$ and asset returns $r_{i, t}$ from canonical simulation records:
-1. **Herfindahl-Hirschman Index (HHI):**
-   $$HHI_t = \sum_{i \in \text{Assets}} w_{\text{hold}, i, t}^2$$
-2. **Effective Number of Constituents ($N_{\text{eff}}$):**
-   $$N_{\text{eff}, t} = \frac{1}{HHI_t} = \frac{1}{\sum_{i=1}^K w_{\text{hold}, i, t}^2}$$
-3. **Sector Holding Frequency & Average Weight:**
-   $$\bar{w}_i = \frac{1}{T} \sum_{t=1}^T w_{\text{hold}, i, t}, \quad \text{Freq}_i = \frac{1}{T} \sum_{t=1}^T \mathbb{I}(w_{\text{hold}, i, t} > 0)$$
-4. **Sector Return Attribution Share:**
-   $$\text{Attribution Share}_i = \frac{\sum_{t=1}^T \text{contrib}_{i, t}}{\sum_{i} \sum_{t=1}^T \text{contrib}_{i, t}}$$
-5. **Marginal Contribution to Risk (Component Volatility):**
-   Using trailing 60-day covariance matrix $\mathbf{\Sigma}_t$:
-   $$CV_{i, t} = w_i(t) \frac{(\mathbf{\Sigma}_t \mathbf{w}_t)_i}{\sigma_{p, t}}$$
+#### 2. Herfindahl-Hirschman Index (HHI) and Effective Number of Assets ($N_{\text{eff}}$)
+* Herfindahl-Hirschman Index: $HHI_t = \sum_i w_i(t)^2$.
+* Effective Number of Constituents: $N_{\text{eff}, t} = \frac{1}{HHI_t} = \frac{1}{\sum_i w_i(t)^2}$.
 
-#### 3. Required Input Artifacts
-* `results/portfolio_backtest/daily_simulation_{variant}.parquet` (all 4 variants).
-
-#### 4. Existing Implementation Dependencies
-* Pure analytical evaluation on existing parquet records. Zero backtest execution required.
-
-#### 5. Required Calculations and Metrics
-* Mean, Median, Min, Max $HHI$ and $N_{\text{eff}}$ by period.
-* Full-period and period-specific return contribution tables for all 6 sectors, NIFTY 50, and Cash.
-* Risk concentration percentage: top-1 and top-2 sector risk contribution.
-
-#### 6. Feasibility with Existing Data
-**Fully Feasible.**
-
-#### 7. Potential Look-Ahead or Methodological Risks
-**Zero risk.** All data is ex-post realized from canonical simulations.
-
-#### 8. Target Strategy Scope
-**All 4 canonical strategies (1A, 1B, 2A, 2B).**  
-*Rationale:* Contrasts fixed 50/50 allocation (1A) vs. inverse-volatility allocation (1B), and fully invested (1A/1B) vs. cash buffer (2A/2B).
-
-#### 9. Expected Parquet Output
-`results/portfolio_backtest/robustness/concentration_metrics.parquet`  
-*Schema (12 rows: 4 strategies $\times$ 3 periods):*  
-`strategy`, `period`, `mean_hhi`, `min_hhi`, `max_hhi`, `mean_n_eff`, `min_n_eff`, `max_n_eff`, `top1_sector_avg_weight`, `top2_sector_avg_weight`, `cash_avg_weight`.  
-*Accompanied by:* `results/portfolio_backtest/robustness/sector_attribution_breakdown.parquet` (sector-by-sector return contribution breakdown).
-
-#### 10. Required Validation and Reproducibility Tests
-* Verify $\sum \text{contrib}_i + \text{contrib}_{\text{cost}} = \sum r_{\text{net}}$ for every strategy and period.
-* Verify $1.0 \le N_{\text{eff}} \le 6.0$ for all sessions.
+#### 3. Treatment of Cash in Concentration Metrics
+To avoid distorting concentration analysis in cash-toggle strategies (Variants 2A and 2B), two distinct HHI metrics will be computed and reported:
+1. **Total Portfolio HHI ($HHI_{\text{total}}$):**
+   Includes cash as a distinct asset:
+   $$HHI_{\text{total}, t} = \sum_{i \in \text{Sectors}} w_{i, t}^2 + w_{\text{cash}, t}^2, \quad N_{\text{eff, total}, t} = \frac{1}{HHI_{\text{total}, t}}$$
+   Reflects true balance-sheet concentration. When Strategy 2A holds 40% cash and 30% each in two sectors:
+   $$HHI_{\text{total}} = 0.40^2 + 0.30^2 + 0.30^2 = 0.16 + 0.09 + 0.09 = 0.34 \implies N_{\text{eff, total}} = 2.94$$
+2. **Equity-Only Sector HHI ($HHI_{\text{equity}}$):**
+   Normalizes sector weights over the equity portion only:
+   $$\tilde{w}_{i, t} = \frac{w_{i, t}}{1 - w_{\text{cash}, t}}, \quad HHI_{\text{equity}, t} = \sum_{i \in \text{Sectors}} \tilde{w}_{i, t}^2, \quad N_{\text{eff, equity}, t} = \frac{1}{HHI_{\text{equity}, t}}$$
+   Isolates pure sector diversification independent of cash drag. In Strategy 2A, the two equity sectors are equal-weighted (50/50 of equity), yielding $HHI_{\text{equity}} = 0.50^2 + 0.50^2 = 0.50 \implies N_{\text{eff, equity}} = 2.0$.
 
 ---
 
-### Investigation 4 — Subperiod Stability
+### Investigation 4 — Subperiod Stability & Objective Environmental Partitions
 
-#### 1. Research Objective
-Evaluate whether strategy performance and active alpha are consistently distributed across different market environments, or whether full-cycle performance was driven by a single anomalous period.
+#### 1. Empirical Calendar Year Partitioning & Reconciliation
+The session counts across the 1,686 daily return intervals were independently audited and verified against `results/portfolio_backtest/daily_simulation_1A.parquet`:
 
-#### 2. Exact Methodology
-Segment the 1,686 daily return intervals into three independent, objectively defined categorical dimensions:
+| Calendar Year | Start Date | End Date | Daily Return Intervals ($N$) | Evaluation Classification | Notes |
+| :---: | :---: | :---: | :---: | :---: | :--- |
+| **2019** | 2019-11-01 | 2019-12-31 | **41** | In-Sample (Training) | Partial Year (2 Months). Inception Date 0 is 2019-10-31 Close (42 price sessions, exactly 41 return intervals). |
+| **2020** | 2020-01-02 | 2020-12-31 | **249** | In-Sample (Training) | Full Year. Pandemic crash (March) and liquidity recovery. |
+| **2021** | 2021-01-04 | 2021-12-31 | **238** | In-Sample (Training) | Full Year. Broad secular bull market across sectors. |
+| **2022** | 2022-01-03 | 2022-12-30 | **247** | In-Sample (Training) | Full Year. Global rate hikes and inflation consolidation. |
+| **2023** | 2023-01-02 | 2023-12-29 | **245** | In-Sample (Training) | Full Year. Midcap and sectoral momentum expansion. |
+| **2024** | 2024-01-02 | 2024-12-31 | **244** | In-Sample (Training) | Full Year. General election year and peak momentum. |
+| **2025** | 2025-01-02 | 2025-12-31 | **247** | Previously Examined Holdout | Full Year. Out-of-Sample Part 1: Range-bound consolidation, FII outflows. |
+| **2026** | 2026-01-02 | 2026-09-18 | **175** | Previously Examined Holdout | Partial Year (8.5 Months). Out-of-Sample Part 2: Tariff/geopolitical drag through terminal date. |
+| **Total Full Cycle** | **2019-11-01** | **2026-09-18** | **1,686** | **Full History** | **Sum of all 8 calendar years: 41 + 249 + 238 + 247 + 245 + 244 + 247 + 175 = 1,686.** |
 
-1. **Calendar Years:**
-   - 2019 (Partial: 2019-11-01 to 2019-12-31, $N=42$)
-   - 2020 (Pandemic crash and recovery, $N=252$)
-   - 2021 (Broad secular bull market, $N=248$)
-   - 2022 (Global rate hike & inflation consolidation, $N=248$)
-   - 2023 (Renewed sectoral momentum, $N=245$)
-   - 2024 (Election year & peak momentum, $N=246$)
-   - 2025 (Holdout Part 1: Range-bound consolidation, $N=246$)
-   - 2026 (Holdout Part 2: Tariff/geopolitical drag, 2026-01-01 to 2026-09-18, $N=176$)
-2. **Market Direction (Trend Regime via NIFTY 50 200-day SMA):**
-   - **Bull Market Sessions:** NIFTY 50 Close $> \text{SMA}_{200}(\text{NIFTY 50})$.
-   - **Bear / Correction Sessions:** NIFTY 50 Close $\le \text{SMA}_{200}(\text{NIFTY 50})$.
-3. **Volatility Environment (India VIX Cutoffs):**
-   - **Low Volatility:** India VIX $< 13.0$.
-   - **Normal Volatility:** $13.0 \le \text{India VIX} < 18.0$.
-   - **High Volatility:** India VIX $\ge 18.0$.
+* **Reconciliation with 2026-10-23:**  
+  The canonical historical market dataset downloaded in Phase 1 and frozen through Phase 10 terminates at **2026-09-18** (1,886 price dates from 2019-01-02 to 2026-09-18). The date `2026-10-23` appears in the repository as the execution timestamp of Phase 6/7 notebooks, NOT the historical market price cutoff. Strict research integrity rules prohibit downloading new historical data. Thus, 2026 coverage correctly terminates on `2026-09-18` with exactly **$N = 175$ return intervals**.
+* Annualized metrics for partial years must use exact session counts: $\text{CAGR} = (\text{NAV}_{\text{end}} / \text{NAV}_{\text{start}})^{252 / N} - 1$.
 
-#### 3. Required Input Artifacts
-* `results/portfolio_backtest/daily_simulation_{variant}.parquet`
-* `results/portfolio_backtest/daily_simulation_benchmark_nifty50.parquet`
-* `data/processed/aligned/india_vix_aligned.csv`
+#### 2. Causal 200-day SMA Warm-Up & Zero Dropped Evaluation Dates
+* In `data/processed/aligned/nifty50_aligned.csv`, historical price records begin on **2019-01-02**.
+* Exactly **200 trading sessions exist between 2019-01-02 and 2019-10-31** (Date 0).
+* Therefore, the 200-day rolling simple moving average is already fully warmed up and populated on Date 0:
+  $$\text{SMA}_{200}(\text{2019-10-31}) = 11,313.61, \quad \text{SMA}_{200}(\text{2019-11-01}) = 11,319.11$$
+* **Zero evaluation sessions are dropped.** All 1,686 evaluation intervals possess a valid, non-null, causal 200-day SMA.
+* **Causal Definition:** On session $t$, state is Bull if $P_{\text{NIFTY}, t} > \text{SMA}_{200}(t)$; Bear if $P_{\text{NIFTY}, t} \le \text{SMA}_{200}(t)$.
 
-#### 4. Existing Implementation Dependencies
-* Reuses metric calculation routines from `src/comparative_evaluation.py`.
-
-#### 5. Required Calculations and Metrics
-For each subperiod partition:
-* Session count ($N$).
-* Net Total Return, Annualized Net Return, Annualized Volatility, Sharpe Ratio ($\text{RF}=0\%$).
-* Benchmark Net Return (NIFTY 50), Active Return, Win Rate (% of sessions with positive net return).
-* Maximum Drawdown (rebased to 1.0 at subperiod start).
-
-#### 6. Feasibility with Existing Data
-**Fully Feasible.** All price and VIX data exist in `data/processed/aligned/`.
-
-#### 7. Potential Look-Ahead or Methodological Risks
-- Subperiods are strictly exogenous (calendar dates, 200-day rolling SMA of the benchmark, and VIX levels).
-- **Rule:** Under no circumstances should subperiods be defined post-hoc based on strategy equity curve peaks/troughs.
-
-#### 8. Target Strategy Scope
-**All 4 canonical strategies (1A, 1B, 2A, 2B) + NIFTY 50 Benchmark.**
-
-#### 9. Expected Parquet Output
-`results/portfolio_backtest/robustness/subperiod_stability.parquet`  
-*Schema (rows = strategies $\times$ subperiod categories):*  
-`strategy`, `partition_type` (calendar_year, trend_regime, vix_regime), `subperiod_label`, `sample_count`, `net_return`, `ann_return`, `ann_vol`, `sharpe_ratio`, `max_drawdown`, `nifty50_return`, `active_return`.
-
-#### 10. Required Validation and Reproducibility Tests
-* Verify $\sum N_{\text{years}} = 1,686$.
-* Verify $N_{\text{bull}} + N_{\text{bear}} = 1,686$.
-* Verify $N_{\text{low\_vix}} + N_{\text{norm\_vix}} + N_{\text{high\_vix}} = 1,686$.
+#### 3. Volatility Environment Partitions (Fixed India VIX Thresholds)
+To prevent look-ahead contamination, VIX thresholds are derived strictly from the **Training-Period-Only (2019–2024) Distribution** and standard institutional benchmarks:
+* **Low Volatility Environment:** India VIX $< 13.0$ (corresponds to lower quartile of training period; 20.6% of training sessions).
+* **Normal Volatility Environment:** $13.0 \le \text{India VIX} < 18.0$ (interquartile training range; 40.1% of training sessions).
+* **High Volatility / Stress Environment:** $\text{India VIX} \ge 18.0$ (upper quartile of training period; 39.3% of training sessions).
+* **Fixed Invariance Rule:** These thresholds remain 100% fixed throughout the evaluation and are **never** re-estimated using holdout observations.
 
 ---
 
-### Investigation 5 — Regime Stability
+### Investigation 5 — Regime Stability & Transition Dynamics
 
-#### 1. Research Objective
-Evaluate strategy behavior and risk-return characteristics conditional on each discovered HMM regime, and determine whether performance is stable across regime classifications or concentrated in specific regimes.
+#### 1. Regime-Conditional Metrics
+Using causal state assignments (`accepted_regime` $\in \{0, 1, 2, 3, 4, 5\}$):
+* Session count $N_k$ and time percentage $N_k / N_{\text{total}}$.
+* Mean daily return and annualized net return: $\bar{r}_k \times 252$.
+* Annualized sample volatility: $s_k \times \sqrt{252}$.
+* Regime Sharpe ratio: $(\bar{r}_k \times 252) / (s_k \times \sqrt{252})$.
+* Cumulative arithmetic return contribution: $\text{CumContrib}_k = \sum_{t \in \mathcal{T}_k} r_{\text{net}, t}$.
 
-#### 2. Exact Methodology
-Using the causal regime labels established in the simulation records (`accepted_regime` $\in \{0, 1, 2, 3, 4, 5\}$):
-1. **Regime-Conditional Performance:**
-   Slice daily returns by incumbent accepted regime:
-   $$\bar{r}_k = \frac{1}{N_k} \sum_{t \in \mathcal{T}_k} r_{\text{net}, t}, \quad \sigma_k = \sqrt{\frac{1}{N_k - 1} \sum_{t \in \mathcal{T}_k} (r_{\text{net}, t} - \bar{r}_k)^2} \times \sqrt{252}$$
-2. **Cumulative Return Contribution by Regime:**
-   $$\text{CumContrib}_k = \sum_{t \in \mathcal{T}_k} r_{\text{net}, t}$$
-3. **Transition vs. Holding Stability:**
-   Compare sessions on rebalance execution dates ($t+1$ close) vs. stationary holding sessions.
-4. **Drawdown Attribution by Regime:**
-   Measure which regime accounted for the deepest drawdown phases.
-
-#### 3. Required Input Artifacts
-* `results/portfolio_backtest/daily_simulation_{variant}.parquet`
-
-#### 4. Existing Implementation Dependencies
-* Causal regime metadata in existing simulation parquets.
-
-#### 5. Required Calculations and Metrics
-* Regime frequency: session count $N_k$ and % of total timeline.
-* Annualized Net Return, Annualized Volatility, Regime Sharpe Ratio.
-* Win rate (% of positive sessions) per regime.
-* Average turnover incurred upon entering each regime.
-
-#### 6. Feasibility with Existing Data
-**Fully Feasible.**
-
-#### 7. Potential Look-Ahead or Methodological Risks
-- Must use `accepted_regime` (the causal operational regime governing holding weights), NOT retrospective smoothed HMM states.
-- Handled properly in canonical parquets.
-
-#### 8. Target Strategy Scope
-**All 4 canonical strategies (1A, 1B, 2A, 2B).**
-
-#### 9. Expected Parquet Output
-`results/portfolio_backtest/robustness/regime_stability.parquet`  
-*Schema (72 rows: 4 strategies $\times$ 6 regimes $\times$ 3 periods):*  
-`strategy`, `period`, `regime_id`, `regime_name`, `sample_count`, `regime_pct_time`, `net_return_ann`, `volatility_ann`, `sharpe_ratio`, `cumulative_return_drag_or_gain`, `rebalance_count_in_regime`.
-
-#### 10. Required Validation and Reproducibility Tests
-* Verify $\sum_{k=0}^5 N_k = N_{\text{period}}$ for all periods.
-* Verify that cumulative returns by regime sum to the portfolio's total arithmetic return.
+#### 2. Transition vs. Steady-State Holding Analysis
+* **Transition Sessions:** Rebalance execution sessions ($t+1$ Close) where target weights change.
+* **Steady-State Sessions:** Sessions where portfolio drifts without rebalancing.
+* Compare return distributions, transaction costs paid, and slippage between transition days and stationary holding days.
 
 ---
 
-### Investigation 6 — Parameter and Model Sensitivity
+### Investigation 6 — Parameter and Model Sensitivity Grid
 
-#### 1. Research Objective
-Assess how sensitive the strategy is to the operational thresholds that govern regime acceptance, trading frequency, and asset sizing. Evaluate whether the 0.50 probability threshold and 5-day lockup represent fragile knife-edge parameters.
-
-#### 2. Exact Methodology
-* **Grid 1 — Confidence Threshold ($P_{\text{thresh}}$):**
-  Perturb the threshold required to accept a new regime:
+#### 1. Geometry of the 42-Cell Primary Parameter Grid (Strategy 1A)
+The primary sensitivity exploration evaluates a complete 2D parameter grid on **Strategy 1A** (the reference strategy):
+* **Confidence Threshold ($P_{\text{thresh}}$) — 7 Values:**
   $$P_{\text{thresh}} \in \{0.40, 0.45, 0.50 \text{ [baseline]}, 0.55, 0.60, 0.65, 0.70\}$$
-  Using the frozen causal posterior probabilities $P(S_t = j | Y_{1:t})$ from `results/regime_discovery/hmm_causal_probabilities.csv`.
-* **Grid 2 — Minimum Holding Lockup ($T_{\text{lock}}$):**
-  Perturb the lockup period before non-crisis rebalancing is permitted:
-  $$T_{\text{lock}} \in \{1, 3, 5 \text{ [baseline]}, 10, 15, 20\} \text{ trading days}$$
-* **Grid 3 — Volatility Lookback Window ($L_{\text{vol}}$, for Variants 1B and 2B):**
-  Perturb the realized volatility lookback:
-  $$L_{\text{vol}} \in \{10, 20 \text{ [baseline]}, 40\} \text{ trading days}$$
+  (Minimum: 0.40, Baseline: 0.50, Maximum: 0.70; uniform step: 0.05).
+* **Minimum Holding Lockup ($T_{\text{lock}}$) — 6 Values:**
+  $$T_{\text{lock}} \in \{1 \text{ [Min]}, 3, 5 \text{ [Baseline]}, 10, 15, 20 \text{ [Max]}\} \text{ trading sessions}$$
+* **Total Primary Grid Combinations:** $7 \times 6 = \mathbf{42 \text{ parameter cells}}$.
 
-#### 3. Required Input Artifacts
-* `results/regime_discovery/hmm_causal_probabilities.csv`
-* `data/processed/aligned/` (aligned sector and NIFTY 50 prices)
+#### 2. Parameter Range Justifications
+* $P_{\text{thresh}} < 0.40$ approaches noise (since with 6 states, uniform prior is $1/6 \approx 0.167$, and dominant states rarely fall below 0.35).
+* $P_{\text{thresh}} > 0.70$ causes extreme model paralysis where new regimes are almost never accepted, locking the incumbent regime indefinitely.
+* $T_{\text{lock}} = 1$ tests instantaneous rebalancing (zero lockup, maximum whipsaw exposure).
+* $T_{\text{lock}} = 20$ represents monthly rebalance lockup (20 trading sessions $\approx 1$ calendar month).
 
-#### 4. Existing Implementation Dependencies
-* `RegimeRotationRulesEngine` in `src/regime_rotation_rules.py`.
-* `simulate_portfolio()` in `src/portfolio_backtest.py`.
+#### 3. Treatment of Volatility Lookback ($L_{\text{vol}}$)
+* For Strategy 1A and 2A (Equal-Weight), $L_{\text{vol}}$ is **not applicable** because equity sectors are allocated 50/50. $L_{\text{vol}}$ is omitted from the primary grid.
+* For Inverse-Volatility variants (1B and 2B), $L_{\text{vol}}$ is **frozen at the 20-day baseline** during boundary cross-checks, and evaluated in a dedicated **1D Sensitivity Slice**:
+  $$L_{\text{vol}} \in \{10, 20 \text{ [baseline]}, 40\} \text{ trading sessions}$$
+  at baseline $P=0.50, T=5$. This keeps reporting structured and prevents a 3D combinatorial explosion.
 
-#### 5. Required Calculations and Metrics
-* Rebalance count and annualized turnover across each parameter pair.
-* Training Net CAGR, Holdout Net CAGR, Full-Cycle Net CAGR.
-* Sharpe Ratio, Maximum Drawdown, and Stability Gradient (sensitivity of CAGR to marginal changes in parameters).
+#### 4. Diagnostic Topography vs. Optimization Safeguard
+* **Explicit Research Boundary:** The 42-cell grid is strictly a diagnostic tool to map the **stability surface** (verifying that CAGR and Sharpe degrade smoothly rather than falling off a cliff).
+* **No Optimization Rule:** Under no circumstances will any parameter pair from this grid be selected or retroactively substituted as a "new best" strategy for the holdout period.
 
-#### 6. Feasibility with Existing Data
-**Feasible with Limitations.**  
-*Strict Methodological Boundaries:*  
-- Re-estimating the underlying HMM (e.g. changing state counts $K \in \{4, 6, 8\}$ or feature subsets) is **strictly out of scope** and prohibited. That represents model respecification, not strategy robustness.
-- All parameter sweeps operate strictly on the **frozen causal probabilities**.
-- Parameter results must **never** be used to select a "new best" strategy for the holdout period.
-
-#### 7. Potential Look-Ahead or Methodological Risks
-- To prevent look-ahead bias, parameter sensitivity must report Training and Holdout performance strictly segregated.
-- The holdout period must not be used to optimize or tune parameters.
-
-#### 8. Target Strategy Scope
-**Primary Focus on Strategy 1A (Primary Reference Strategy)** for the full 2D grid ($P_{\text{thresh}} \times T_{\text{lock}}$: $7 \times 6 = 42$ runs).  
-**Boundary Validation on 1B, 2A, 2B** at extreme points ($P \in \{0.40, 0.50, 0.60\}$ and $T \in \{1, 5, 10\}$) to verify cross-variant stability.
-
-#### 9. Expected Parquet Output
-`results/portfolio_backtest/robustness/parameter_sensitivity.parquet`  
-*Schema (rows = parameter combinations $\times$ 3 periods):*  
-`strategy`, `confidence_thresh`, `min_holding_days`, `vol_lookback`, `period`, `rebalance_count`, `ann_turnover`, `net_cagr`, `sharpe_ratio`, `max_drawdown`.
-
-#### 10. Required Validation and Reproducibility Tests
-* At baseline parameters ($P=0.50, T=5, L=20$), the output must match canonical baseline results exactly.
+#### 5. True Extreme Boundary Cross-Checks for Variants 1B, 2A, and 2B
+To rigorously test whether sensitivity patterns hold across asset allocation templates and weighting schemes at the true parameter bounds, a standardized **$3 \times 3 = 9$ cell Extreme Boundary Matrix** will be evaluated on Variants 1B, 2A, and 2B:
+$$P_{\text{thresh}} \in \{0.40 \text{ [Min]}, 0.50 \text{ [Baseline]}, 0.70 \text{ [Max]}\} \times T_{\text{lock}} \in \{1 \text{ [Min]}, 5 \text{ [Baseline]}, 20 \text{ [Max]}\}$$
+($9 \times 3 = 27$ runs total).  
+*Clarification on Boundary Selection:* Incorporating the true extrema ($P=0.70$ and $T=20$) rather than intermediate points ($P=0.60, T=10$) ensures that the cross-check tests genuine outer boundaries (paralysis vs. churn) across all strategy variants.
 
 ---
 
-### Investigation 7 — Benchmark Sensitivity
+### Investigation 7 — Benchmark Sensitivity & Naive Momentum Comparator
 
-#### 1. Research Objective
-Assess whether the strategy's returns are driven by broad market beta, sector rotation skill, or simple price momentum. Evaluate market-direction asymmetry (Up-Market vs. Down-Market Beta).
+#### 1. Dual-Beta Regression (Up-Market vs. Down-Market Beta)
+Estimate separate market sensitivities conditional on benchmark direction:
+$$r_{\text{strat}, t} = \alpha + \beta^+ \max(r_{\text{mkt}, t}, 0) + \beta^- \min(r_{\text{mkt}, t}, 0) + \epsilon_t$$
+* $\Delta \beta = \beta^+ - \beta^-$ measures directional asymmetry. A positive $\Delta \beta$ indicates higher upside participation than downside exposure.
 
-#### 2. Exact Methodology
-1. **Up-Market vs. Down-Market Dual Beta Regression:**
-   Estimate separate sensitivities during rising vs. falling markets:
-   $$r_{\text{strat}, t} = \alpha + \beta^+ \max(r_{\text{mkt}, t}, 0) + \beta^- \min(r_{\text{mkt}, t}, 0) + \epsilon_t$$
-2. **Up-Market and Down-Market Capture Ratios:**
-   $$\text{Up Capture} = \frac{\bar{r}_{\text{strat}}^+}{\bar{r}_{\text{mkt}}^+}, \quad \text{Down Capture} = \frac{\bar{r}_{\text{strat}}^-}{\bar{r}_{\text{mkt}}^-}, \quad \text{Capture Ratio} = \frac{\text{Up Capture}}{\text{Down Capture}}$$
-   A Capture Ratio $> 1.0$ indicates positive return asymmetry (capturing more upside than downside).
-3. **Market Timing Asymmetry (Treynor-Mazuy Quadratic Regression):**
-   $$r_{\text{strat}, t} = \alpha + \beta_1 r_{\text{mkt}, t} + \gamma r_{\text{mkt}, t}^2 + \epsilon_t$$
-   $\gamma > 0$ indicates statistically significant convex market-timing skill.
-4. **Comparison Against Naive Momentum Benchmark:**
-   Construct a monthly rebalanced **Top-2 Cross-Sectional Momentum Benchmark** using trailing 20-day returns directly from existing sector prices. This tests whether HMM regime discovery adds structural value over simple price momentum.
+#### 2. Up-Market and Down-Market Capture Ratios
+$$\text{Up Capture} = \frac{\bar{r}_{\text{strat}}^+}{\bar{r}_{\text{mkt}}^+}, \quad \text{Down Capture} = \frac{\bar{r}_{\text{strat}}^-}{\bar{r}_{\text{mkt}}^-}, \quad \text{Capture Ratio} = \frac{\text{Up Capture}}{\text{Down Capture}}$$
+A Capture Ratio $> 1.0$ indicates favorable asymmetric return capture.
 
-#### 3. Required Input Artifacts
-* `results/portfolio_backtest/daily_simulation_{variant}.parquet`
-* `results/portfolio_backtest/daily_simulation_benchmark_nifty50.parquet`
-* `results/portfolio_backtest/daily_simulation_benchmark_equal_weight.parquet`
-* `data/processed/aligned/` (sector prices for momentum benchmark)
+#### 3. Market Timing Curvature (Treynor-Mazuy Model)
+$$r_{\text{strat}, t} = \alpha + \beta_1 r_{\text{mkt}, t} + \gamma r_{\text{mkt}, t}^2 + \epsilon_t$$
+$\gamma > 0$ indicates statistically significant convex market timing skill.
 
-#### 4. Existing Implementation Dependencies
-* Regression helpers in `src/comparative_evaluation.py` and benchmark backtesting logic in `src/benchmark_backtest.py`.
-
-#### 5. Required Calculations and Metrics
-* $\beta^+, \beta^-$, $\Delta \beta = \beta^+ - \beta^-$, and p-values.
-* Up Capture (%), Down Capture (%), Capture Ratio.
-* Treynor-Mazuy curvature $\gamma$ and p-value.
-* Relative metrics (Alpha, Beta, IR) against the Naive Momentum Benchmark.
-
-#### 6. Feasibility with Existing Data
-**Fully Feasible.**
-
-#### 7. Potential Look-Ahead or Methodological Risks
-- The Momentum Benchmark must use $t+1$ close execution and 15 bps transaction cost to ensure 100% fair methodology alignment with our strategies.
-
-#### 8. Target Strategy Scope
-**All 4 canonical strategies (1A, 1B, 2A, 2B).**
-
-#### 9. Expected Parquet Output
-`results/portfolio_backtest/robustness/benchmark_sensitivity.parquet`  
-*Schema (24 rows: 4 strategies $\times$ 2 primary benchmarks $\times$ 3 periods):*  
-`strategy`, `benchmark`, `period`, `beta_up`, `beta_down`, `capture_up`, `capture_down`, `capture_ratio`, `treynor_mazuy_gamma`, `gamma_pval`.  
-*Accompanied by:* `results/portfolio_backtest/robustness/momentum_benchmark_comparison.parquet`.
-
-#### 10. Required Validation and Reproducibility Tests
-* Verify that linear Beta from Phase 10.5 lies between $\beta^+$ and $\beta^-$.
-* Confirm that Momentum Benchmark adheres to the identical calendar schedule and 15 bps fee structure.
+#### 4. Naive Top-2 Cross-Sectional Momentum Comparator
+To establish whether the HMM regime discovery adds structural predictive value over naive price momentum, an active momentum benchmark will be constructed adhering to strict fair-methodology principles:
+1. **Investable Universe:** Identical 6 sector indices (AUTO, BANK, FMCG, IT, METAL, PHARMA).
+2. **Causal Signal Formulation:** On month-end signal session $t$, compute trailing 20-trading-day simple price return for each sector:
+   $$R_{i, 20d}(t) = \frac{P_{i, t}}{P_{i, t-20}} - 1$$
+   Strictly causal, using only closing prices available at session $t$ close.
+3. **Portfolio Allocation:** Top 2 sectors with the highest trailing 20-day return, allocated strictly **50% / 50% Equal-Weight**.
+   - Zero cash toggle (100% equity invested at all times).
+   - Zero inverse-volatility weighting (strictly fixed 0.50 / 0.50).
+   - Zero HMM probabilities, confidence thresholds, or hidden state inputs.
+4. **Rebalance Schedule:** Calendar month-end signal at date $t$ Close, executing at date $t+1$ Close (identical to Benchmark B).
+5. **Execution & Cost Accounting:** Evaluated through the identical `simulate_portfolio` engine, with intra-month price drift, actual one-way turnover tracking, and 15 bps fee deduction.
+6. **Benchmark Hierarchy:** **NIFTY 50 remains the primary statutory benchmark.** The Naive Momentum Benchmark serves as a supplementary active factor comparator.
 
 ---
 
-## 5. Critical Scope Evaluation: Four Strategies vs. One Strategy
-
-A central mandate of this audit is evaluating whether all seven investigations should be conducted on:
-1. All four canonical strategies independently (1A, 1B, 2A, 2B).
-2. Only the primary/final selected strategy.
-3. A combination/tiered scope.
-
-### 5.1 Comparative Analysis Matrix
-
-| Evaluation Dimension | Strategy 1A | Strategy 1B | Strategy 2A | Strategy 2B |
-| :--- | :---: | :---: | :---: | :---: |
-| **Asset Allocation Template** | Template A (100% Equity) | Template A (100% Equity) | Template B (Cash Buffer) | Template B (Cash Buffer) |
-| **Weighting Scheme** | Equal-Weight (50/50) | Inverse-Volatility | Equal-Weight | Inverse-Volatility |
-| **Free Parameters** | Fewest (0 extra) | Realized Vol Lookback (20d) | Cash Res (30% R1, 40% R3, 20% R5) | Cash Res + Vol Lookback |
-| **Full-Period Net CAGR** | **26.89%** | **26.54%** | **23.49%** | **23.16%** |
-| **Holdout Net CAGR** | **-11.87%** | **-12.24%** | **-12.92%** | **-13.20%** |
-| **Full-Period Turnover** | 50.56 TO | 51.61 TO | 51.23 TO | 52.10 TO |
-| **Cash Paid in Fees** | ₹0.3182 | ₹0.3172 | ₹0.2829 | ₹0.2788 |
-
-### 5.2 Architectural & Methodological Evaluation
-1. **Independent Canonical Schedules:**
-   All four variants have distinct canonical schedules generated in Phase 9 (`target_weights_1A.csv`, `1B.csv`, `2A.csv`, `2B.csv`) and independent daily simulation parquets. They are not duplicates.
-2. **Distinct Behavioral Regimes:**
-   Variants 2A and 2B deliberately introduce defensive cash reserves in stressed regimes (Regime 1: 30%, Regime 3: 40%, Regime 5: 20%). Testing only 1A would completely blind the research to whether cash reserves successfully mitigate drawdown or transaction friction during high-stress periods.
-3. **Weighting Sensitivity:**
-   Testing both Equal-Weight (1A/2A) and Inverse-Volatility (1B/2B) reveals whether dynamic volatility weighting stabilizes risk or merely adds unnecessary turnover.
-4. **Computational Footprint:**
-   Because all simulation engines in `src/portfolio_backtest.py` are vectorized in NumPy, simulating a full 1,686-session history takes **0.032 seconds** per strategy. Running all 4 strategies takes under **0.15 seconds**. There is zero computational penalty to testing all four.
-
-### 5.3 Audit Recommendation on Scope
-We strongly recommend the **Tiered Evaluation Scope**:
-* **Universal 4-Strategy Scope:** Investigations 1, 2, 3, 4, 5, and 7 must be conducted on **all four strategies**. This preserves the scientific rigor of the 2x2 experimental matrix.
-* **Focused Primary Scope with Boundary Cross-Check:** Investigation 6 (Parameter Grids) should execute its deep 42-cell parameter matrix on **Strategy 1A** (the reference strategy), with boundary validation checks executed on 1B, 2A, and 2B.
-
----
-
-## 6. Recommended Testing Scope Summary
+## 5. Summary of Recommended Testing Scope
 
 | Investigation | Scope Recommendation | Evaluated Variants | Total Output Rows |
 | :--- | :---: | :---: | :---: |
 | **Inv 1: Cost Sensitivity** | **All 4 Strategies** | 1A, 1B, 2A, 2B | 84 rows (4 strat $\times$ 7 costs $\times$ 3 per) |
 | **Inv 2: Execution Sensitivity** | **All 4 Strategies** | 1A, 1B, 2A, 2B | 48 rows (4 strat $\times$ 4 models $\times$ 3 per) |
-| **Inv 3: Concentration** | **All 4 Strategies** | 1A, 1B, 2A, 2B | 12 rows (4 strat $\times$ 3 per) + sector attribution |
+| **Inv 3: Concentration** | **All 4 Strategies** | 1A, 1B, 2A, 2B | 12 rows (4 strat $\times$ 3 per) + sector risk/return breakdown |
 | **Inv 4: Subperiod Stability** | **All 4 Strategies + BM** | 1A, 1B, 2A, 2B, NIFTY 50 | 65 rows (5 ports $\times$ 13 subperiods) |
 | **Inv 5: Regime Stability** | **All 4 Strategies** | 1A, 1B, 2A, 2B | 72 rows (4 strat $\times$ 6 regimes $\times$ 3 per) |
-| **Inv 6: Parameter Grid** | **Primary (1A) + Cross-Check**| 1A full; 1B, 2A, 2B boundaries | 162 rows (42 grid + 12 cross-check $\times$ 3 per) |
+| **Inv 6: Parameter Grid** | **Primary (1A) + True Boundary Checks**| 1A full (42); 1B, 2A, 2B extrema (9 each) | 213 rows ((42 + 27 + 2 vol) $\times$ 3 per) |
 | **Inv 7: Benchmark Sensitivity**| **All 4 Strategies** | 1A, 1B, 2A, 2B | 24 rows + momentum benchmark rows |
 
 ---
 
-## 7. Data and Artifact Dependencies
+## 6. Proposed Parquet Output Architecture
 
-All required data and artifacts currently exist in the repository. **Zero external data downloads or package installations are required.**
-
-```
-Project Data & Artifact Dependencies
-├── data/processed/aligned/
-│   ├── nifty50_aligned.csv                      (Price, Open, High, Low, Close, Volume)
-│   ├── nifty_{auto, bank, fmcg, it, metal, pharma}_aligned.csv
-│   └── india_vix_aligned.csv                    (For Volatility Subperiod Partitioning)
-├── results/regime_discovery/
-│   └── hmm_causal_probabilities.csv             (Causal posterior probabilities, 6 states)
-├── results/portfolio_construction/
-│   └── target_weights_{1A, 1B, 2A, 2B}.csv      (Canonical target-weight schedules)
-└── results/portfolio_backtest/
-    ├── daily_simulation_{1A, 1B, 2A, 2B}.parquet(Authoritative daily simulation records)
-    ├── daily_simulation_benchmark_nifty50.parquet
-    └── daily_simulation_benchmark_equal_weight.parquet
-```
-
----
-
-## 8. Proposed Parquet Output Architecture
-
-Following strict research integrity requirements, all numerical outputs will be stored in Apache Parquet format under a dedicated, non-overlapping directory: `results/portfolio_backtest/robustness/`.
+All numerical records will be persisted in Apache Parquet format in `results/portfolio_backtest/robustness/`:
 
 ```
 results/portfolio_backtest/robustness/
-├── cost_sensitivity.parquet                     (Investigation 1)
-├── execution_sensitivity.parquet                (Investigation 2)
-├── concentration_metrics.parquet                (Investigation 3)
-├── sector_attribution_breakdown.parquet         (Investigation 3)
-├── subperiod_stability.parquet                  (Investigation 4)
-├── regime_stability.parquet                     (Investigation 5)
-├── parameter_sensitivity.parquet                (Investigation 6)
-├── benchmark_sensitivity.parquet                (Investigation 7)
-└── momentum_benchmark_comparison.parquet        (Investigation 7)
+├── cost_sensitivity.parquet                     (Investigation 1: 0–30 bps grid)
+├── execution_sensitivity.parquet                (Investigation 2: t+1, t+2, t Close, t+1 Open)
+├── concentration_metrics.parquet                (Investigation 3: HHI_total, HHI_equity, N_eff)
+├── sector_risk_return_attribution.parquet       (Investigation 3: Return contrib & Component Vol)
+├── subperiod_stability.parquet                  (Investigation 4: Calendar years, SMA bull/bear, VIX)
+├── regime_stability.parquet                     (Investigation 5: HMM regime-conditional performance)
+├── parameter_sensitivity.parquet                (Investigation 6: 42-cell 1A grid + boundary checks)
+├── benchmark_sensitivity.parquet                (Investigation 7: Dual Beta, Capture Ratios, TM Gamma)
+└── momentum_benchmark_comparison.parquet        (Investigation 7: Naive Top-2 Momentum comparator)
 ```
 
-Accompanying human-readable Markdown summaries and visualizations will be compiled in `reports/phase10_6_robustness_testing.md` upon completion of implementation.
+Human-readable Markdown documentation and analytical commentary will be authored in `reports/phase10_6_robustness_testing.md` upon completion of implementation.
 
 ---
 
-## 9. Risks and Research Integrity Considerations
+## 7. Reporting & Research Integrity Standards
 
-1. **Holdout Contamination Risk:**
-   - *Risk:* Using robustness testing results to tune or select parameters that "fix" the holdout underperformance.
-   - *Mitigation:* The holdout period (2025–2026) is strictly an out-of-sample stress test. Parameters must **never** be calibrated against holdout results. All sweeps must report training and holdout performance separately.
-2. **Look-Ahead Bias in Execution Timing:**
-   - *Risk:* Inadvertently leaking $t+1$ prices into day $t$ signal generation during execution sensitivity tests.
-   - *Mitigation:* Signals remain strictly locked to day $t$ Close causal probabilities. Execution shifts ($t+2$ or $t+1$ Open) strictly shift the price index used for trade settlement.
-3. **Overfitting to Subperiods:**
-   - *Risk:* Choosing arbitrary date boundaries that artificially flatter strategy metrics.
-   - *Mitigation:* Subperiods are restricted to exogenous, standard economic boundaries: calendar years, 200-day benchmark SMA, and India VIX quartiles.
-4. **Intraday Data Illusion:**
-   - *Risk:* Assuming daily OHLC data can simulate continuous limit order execution or intraday market impact.
-   - *Mitigation:* Explicitly declare all intraday microstructure simulations as out of scope. Test only discrete session-boundary execution.
+1. **Segregation of Periods:** Every table and visualization must explicitly segregate Training (1,264 sessions), Previously Examined Holdout (422 sessions), and Full Cycle (1,686 sessions).
+2. **Terminology Protocol:** The 2025–2026 holdout period must **never** be described as an "untouched", "unseen", or "fresh" test set. It is formally designated as the **"Previously Examined Out-of-Sample Holdout"**.
+3. **No Retuning or Re-Optimization:** Robustness testing is purely diagnostic. Discovered parameter sensitivities must not be used to retroactively optimize or replace canonical strategy definitions.
+4. **Frozen Baselines:** Phase 1–10.3 and Phase 10.5 canonical schedules, HMM models, transition matrices, prices, and backtest results remain 100% frozen.
 
 ---
 
-## 10. Recommended Implementation Sequence
+## 8. Final Approval Checklist
 
-Once approved, Phase 10.6 implementation should proceed in four disciplined steps:
-
-1. **Step 1 — Engine Extension (`src/robustness_testing.py`):**
-   Implement the dedicated robustness testing module incorporating the 7 parameterizable routines without touching existing canonical files.
-2. **Step 2 — Unit & Integration Test Suite (`tests/test_robustness_testing.py`):**
-   Construct comprehensive unit tests verifying that at baseline parameters, robustness outputs reproduce canonical Phase 10.5 results to $< 10^{-12}$.
-3. **Step 3 — Parquet Generation & Execution:**
-   Execute all seven investigations and export the validated Parquet files to `results/portfolio_backtest/robustness/`.
-4. **Step 4 — Research Report & Notebook:**
-   Author `reports/phase10_6_robustness_testing.md` and `notebooks/robustness_analysis.ipynb` documenting empirical findings, stability curves, and conclusions.
-
----
-
-## 11. Final Recommendations and Decisions Requiring Approval
-
-### Key Decisions for User Sign-Off:
-
-1. **Approval of Investigation Feasibility Classifications:**
-   - Agree that Investigations 1, 3, 4, 5, and 7 are **Fully Feasible**.
-   - Agree that Investigation 2 (Execution) is **Feasible with Limitations** (discrete daily session boundaries only; no intraday continuous microstructure).
-   - Agree that Investigation 6 (Parameter Sensitivity) is **Feasible with Limitations** (rule-level thresholds only; no HMM retraining).
-2. **Approval of Strategy Testing Scope:**
-   - Approve the **Tiered Evaluation Scope**:
-     - Test **all four strategies (1A, 1B, 2A, 2B)** on Investigations 1, 2, 3, 4, 5, and 7.
-     - Test **Strategy 1A as the Primary Reference Strategy** for deep parameter sweeps in Investigation 6, with boundary cross-validation on 1B, 2A, and 2B.
-3. **Approval of Proposed Benchmark Extensions:**
-   - Approve adding the **Naive Top-2 Momentum Benchmark** (monthly rebalanced, 15 bps) in Investigation 7 to establish whether HMM regime discovery adds structural value over price momentum.
-4. **Approval of Output Architecture:**
-   - Approve storing all generated tabular artifacts in `results/portfolio_backtest/robustness/` in Apache Parquet format.
+| # | Item | Status | Final Verification Details |
+| :-: | :--- | :---: | :--- |
+| **1** | **Parameter Grid Extrema** | **READY** | $7 \times 6 = 42$ cell primary grid on Strategy 1A ($P \in [0.40, 0.70]$, $T \in [1, 20]$). $3 \times 3 = 9$ cell True Extreme Boundary Matrix ($P \in \{0.40, 0.50, 0.70\} \times T \in \{1, 5, 20\}$) for 1B, 2A, 2B. Diagnostic-only principle strictly enforced. |
+| **2** | **Session Counts & Alignment** | **VERIFIED** | 2019 $N = 41$ return intervals (42 price sessions starting 2019-10-31); 2026 $N = 175$ return intervals. Sum of all 8 years = 1,686. Historical price dataset terminates on 2026-09-18 (2026-10-23 is notebook execution timestamp). |
+| **3** | **Naive Top-2 Momentum Comparator** | **READY** | Strictly 50/50 equal-weight across top-2 trailing 20-day return sectors. Zero cash toggle, zero inverse-vol, zero HMM inputs. Monthly rebalance at $t+1$ Close, 15 bps fee. NIFTY 50 primary. |
+| **4** | **Causal Initialization (SMA & VIX)** | **VERIFIED** | Exactly 200 warm-up sessions exist between 2019-01-02 and 2019-10-31. 200-day rolling SMA is valid on Day 1 (zero evaluation dates dropped). VIX cutoffs ($<13, 13-18, \ge 18$) fixed on training period. |
+| **5** | **Output Architecture** | **READY** | Parquet format under `results/portfolio_backtest/robustness/`. Summary report in Markdown under `reports/`. |
 
 ---
 
 ### Audit Sign-Off Confirmation
-- **Audit Type:** Strictly Read-Only Feasibility Audit.
-- **Repository Modifications:** Zero source code, tests, configs, canonical backtests, or evaluation artifacts were modified.
-- **Execution Status:** **AUDIT COMPLETE. IMPLEMENTATION BLOCKED PENDING USER APPROVAL.**
-
+- **Audit Mode:** Strictly Read-Only Feasibility Audit.
+- **Repository Modifications:** Zero source code files, tests, notebooks, datasets, models, or canonical backtest artifacts were modified.
+- **Execution Status:** **AUDIT FINALIZED. READY FOR PHASE 10.6 IMPLEMENTATION UPON FINAL APPROVAL.**
