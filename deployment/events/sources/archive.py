@@ -311,14 +311,39 @@ def pib_catalogue(session, start, end, evidence):
     return records
 
 
+def fed_catalogue(session, start, end, evidence):
+    url = 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm'
+    data = session.request(url)
+    text = data.decode('utf-8-sig', errors='strict') if isinstance(data, bytes) else data
+    matches = re.findall(r'href=[\x22\x27](/newsevents/pressreleases/monetary(\d{4})(\d{2})(\d{2})[a-z]?\.htm)[\x22\x27]>([^<]+)</a>', text)
+    if not matches:
+        raise SourceError('Federal Reserve FOMC calendar listing is empty or unrecognized')
+    records = []
+    seen = set()
+    for rel_url, y, m, d, link_text in matches:
+        dt = f'{y}-{m}-{d}'
+        match_id = re.search(r'monetary(\d+[a-z]?)\.htm', rel_url)
+        doc_id = match_id.group(1) if match_id else f'{y}{m}{d}'
+        if doc_id in seen:
+            continue
+        seen.add(doc_id)
+        absolute = official_link(rel_url, url, 'www.federalreserve.gov')
+        title = 'Federal Reserve issues FOMC statement' if link_text.strip() == 'HTML' else clean(link_text)
+        records.append({'id': doc_id, 'date': dt, 'title': title, 'url': absolute})
+    all_ids = [r['id'] for r in records]
+    add_page(evidence, url, data, len(records), filters_verified=True,
+             pagination='single calendar archive view', document_ids=all_ids)
+    return records
+
+
 def discover(source, start, end, kind, keywords, category, region='India', session=None):
-    host = {'rbi':'www.rbi.org.in','sebi':'www.sebi.gov.in','pib':'www.pib.gov.in'}[kind]
-    evidence = receipt(source.name,start,end,{'rbi':'RBI press releases','sebi':'SEBI circulars','pib':'PIB all ministries, English Delhi region'}[kind])
+    host = {'rbi':'www.rbi.org.in','sebi':'www.sebi.gov.in','pib':'www.pib.gov.in','fed':'www.federalreserve.gov'}[kind]
+    evidence = receipt(source.name,start,end,{'rbi':'RBI press releases','sebi':'SEBI circulars','pib':'PIB all ministries, English Delhi region','fed':'Federal Reserve FOMC meeting calendars and statements'}[kind])
     source.coverage_evidence = evidence
     session = session or OfficialSession(host)
     events = []
     try:
-        records = {'rbi':rbi_catalogue,'sebi':sebi_catalogue,'pib':pib_catalogue}[kind](session,start,end,evidence)
+        records = {'rbi':rbi_catalogue,'sebi':sebi_catalogue,'pib':pib_catalogue,'fed':fed_catalogue}[kind](session,start,end,evidence)
         if len(records) > MAX_DOCUMENTS: raise SourceError('Combined catalogue document bound exceeded')
         if len({r['id'] for r in records}) != len(records): raise SourceError('Catalogue repeats document IDs across months')
         evidence['pagination_complete'] = True
