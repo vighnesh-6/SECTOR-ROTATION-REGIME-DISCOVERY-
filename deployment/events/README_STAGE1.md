@@ -3,7 +3,8 @@
 This package runs independently of EOD portfolio processing. Research, the EOD
 workflow, shared database code/schema, and website are unchanged. Historical
 backfill is never called by daily automation. Static historical lists remain for
-reference/legacy callers; `fetch_incremental` uses only live official feeds.
+reference/legacy callers; daily collection uses official feeds and bounded official
+catalogues. It never invokes the historical backfill entry point.
 
 ## Deployment status and prerequisites
 
@@ -24,16 +25,15 @@ defaults to disabled. Do not enable it until the following are verified:
    now also run on a temporary official Python 3.11.9 embeddable runtime and the
    installed Python 3.13.5. The temporary runtime is removed after verification;
    no installed interpreter or project configuration is changed.
-4. Official source probes and a manual dry run succeed. In the implementation
-   session RBI, Fed and SEBI parsed successfully. PIB returned Hindi RSS items
-   without publication dates even with the advertised English query parameters;
-   a separate official MOSPI RSS probe failed. MOSPI/PIB coverage is **blocked**,
-   not silently classified as a successful empty source. Items are now validated
-   individually: valid dated events survive invalid siblings, but rejected-item
-   counts/reasons remain visible and the source cannot advance its checkpoint.
-   Do not invent dates,
-   ingest static historical lists, disable TLS checks, or enable production until
-   a functioning official dated feed/approved adapter resolves this blocker.
+4. Official catalogue probes and a manual dry run must succeed for the actual
+   requested interval. RBI full-month press-release tables, SEBI date-filtered
+   circular pages and PIB English/Delhi all-ministry monthly archives now provide
+   bounded coverage receipts. PIB candidate dates are verified against actual
+   release-page timestamps and release IDs. These scopes do not claim all RBI
+   notifications, all SEBI publications, every PIB region/language, or every MOSPI
+   publication outside PIB. Federal Reserve remains RSS-only: RSS bounds alone
+   cannot establish a complete initial checkpoint, so its status remains PARTIAL.
+   This remains a deployment blocker for the default four-source collector.
 5. Run the isolated persistence verification, inspect preservation/concurrency
    evidence, then explicitly set `EVENT_AUTOMATION_ENABLED=true` in repository
    variables. This is an operator action; local changes do not set it.
@@ -95,9 +95,10 @@ of supplying that window, and must not use the historical backfill runner. Until
 then other sources can progress with a PARTIAL status. With no checkpoint, the
 requested start is the required bootstrap boundary; unavailable initial history
 is explicitly blocked rather than silently treated as covered. Existing-checkpoint
-protection is unchanged: optional older lookback can be unavailable if the actual
-checkpoint boundary is covered, and this distinction is reported. RSS retention
-is not a guarantee of complete historical event coverage.
+protection retains the saved boundary and overlapping window. RSS may lack older
+lookback dates, but a complete official receipt must cover the entire effective
+window before a new checkpoint advances. RSS retention is not a guarantee of
+complete historical event coverage.
 
 Every rejected RSS item is counted with a stable reason and item position (the
 detail list is capped at 20, counts are not). Entirely invalid feeds fail; mixed
@@ -115,7 +116,7 @@ Bearer/Basic authorization values and common key/value secret formats are masked
 From repository root with the chosen interpreter, disable bytecode/cache writes:
 
 ```
-python -B -m pytest -q -p no:cacheprovider deployment/tests/test_event_ingestion.py deployment/tests/test_event_automation.py deployment/tests/test_event_feed_recovery.py
+python -B -m pytest -q -p no:cacheprovider deployment/tests/test_event_ingestion.py deployment/tests/test_event_automation.py deployment/tests/test_event_feed_recovery.py deployment/tests/test_event_archives.py
 python -B -m deployment.events.daily_collector --days 14
 python -B -m deployment.events.daily_collector --check-health
 ```
@@ -152,8 +153,36 @@ production. Missing isolation configuration fails before creating a client.
   source checkpoints existed in the isolated branch. No production checkpoint
   dates are claimed or queried. Older saved-cursor gaps are regression-tested.
 - GitHub secrets, live workflow execution, and repository enable-variable state
-  remain unverified. Production collection was not enabled. PIB's undated feed
-  and any unavailable official archive intervals remain deployment blockers.
+  remain unverified. Production collection was not enabled. Federal Reserve
+  catalogue completeness remains unverified; it cannot advance its checkpoint.
+
+## Official coverage and bootstrap evidence
+
+`coverage_verification.json` records the read-only 2026-10-09 through 2026-11-08
+probe using only the isolated branch. It contains public document IDs, listing
+dates/URLs, response hashes and retrieval times, filter/pagination receipts,
+rejections and database duplicate counts. No credentials or existing database
+rows are included. Receipts describe the public catalogues as observed, not a
+guarantee that a publisher never omits a document or revises its archive.
+
+- RBI: submit each requested month through the official press-release page's
+  existing form; require the month echo, dated rows, unique PRIDs, and no paging
+  controls. Unexpected markup, empty months or unsupported pagination fail closed.
+- SEBI: follow the official circular listing's AJAX pagination with explicit date
+  filters. Require contiguous ranges, invariant total, unique IDs and in-range
+  dates. An unrecognised empty-result format fails closed.
+- PIB: submit All Days/All Ministries for each month, with English/Delhi scope;
+  require the echoed filters and declared count to match all parsed unique IDs.
+  Relevant releases require matching document identity and actual Posted On time.
+
+Only complete receipts spanning the entire effective window permit source OK and
+checkpoint advancement. RSS-only bounds cannot certify completeness. Legacy OK
+logs retain their earliest boundary as a conservative recovery anchor until a
+verified receipt supersedes it; they cannot silently reset the requested start.
+Initial deployment must explicitly approve its
+bounded collection start and verify the interval; this does not certify history
+before that start. Older missing intervals require separate approval and verified
+official evidence, never a manual cursor advance or a historical-backfill rerun.
 
 ## Implementation references
 
