@@ -3,6 +3,8 @@
 .env*.local
 .env.production
 .env.development
+.env.*
+!.env.example
 
 # Neon context
 .neon/
