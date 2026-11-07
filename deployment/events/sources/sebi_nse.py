@@ -51,6 +51,10 @@ class SebiNseSource(BaseEventSource):
             ["www.sebi.gov.in", "sebi.gov.in"], "India", "Domestic market shock")
         return [event for event in events if start_date <= event.date <= end_date]
 
+    def recover_official_interval(self, start_date, end_date):
+        from deployment.events.sources.archive import discover
+        return discover(self, start_date, end_date, 'sebi', ['derivative', 'settlement', 'margin', 'market infrastructure', 'short selling', 'short-selling', 'trading framework'], 'Domestic market shock')
+
     def fetch_events(self, start_date: str, end_date: str) -> List[MacroEvent]:
         results: List[MacroEvent] = []
 
