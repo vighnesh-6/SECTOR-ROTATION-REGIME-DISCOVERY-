@@ -43,6 +43,18 @@ class Source:
             raise self.error
         return self.events
 
+    def recover_official_interval(self, start_date, end_date):
+        self.coverage_evidence = coverage_fixture(self.name,start_date,end_date)
+        if self.oldest_publication is None or self.oldest_publication > start_date:
+            self.coverage_evidence['complete'] = False
+        return self.events
+
+
+def coverage_fixture(name,start,end):
+    return {'schema_version':1,'source':name,'requested_window':{'start':start,'end':end},
+            'complete':True,'pagination_complete':True,'rejected_items':[],
+            'document_ids':[],'pages':[{'filters_verified':True,'response_sha256':'a'*64}]}
+
 
 class Storage:
     def __init__(self, checkpoints=None):
@@ -208,6 +220,14 @@ def test_source_checkpoints_use_only_successful_sources():
     db=MagicMock()
     db.query.return_value=[{'details':{'source_status':{'RBI':{'status':'ERROR'},'Fed':{'status':'OK','window':{'end':'2026-11-06'}}}}},
                            {'details':json.dumps({'source_status':{'RBI':{'status':'OK','window':{'end':'2026-11-05'}}}})}]
+    for row in db.query.return_value:
+        details=row['details']
+        if isinstance(details,str): details=json.loads(details);row['details']=details
+        for name,value in details['source_status'].items():
+            if value['status']=='OK':
+                value['window']['start']=value['window']['end']
+                value['checkpoint_advanced']=True
+                value['coverage_evidence']=coverage_fixture(name,value['window']['start'],value['window']['end'])
     assert EventStorage(db).source_checkpoints()=={'Fed':'2026-11-06','RBI':'2026-11-05'}
 
 
