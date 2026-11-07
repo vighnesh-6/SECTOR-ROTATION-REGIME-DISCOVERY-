@@ -25,7 +25,7 @@ export async function GET() {
         prob_3,
         prob_4,
         prob_5,
-        raw_regime_argmax,
+        raw_argmax,
         max_probability,
         is_confident,
         accepted_regime
@@ -83,7 +83,7 @@ export async function GET() {
         economic_name: REGIME_ECONOMIC_NAMES[acceptedId] || "Unknown Regime",
         is_confident: latest.is_confident,
         max_probability: parseFloat(latest.max_probability),
-        raw_argmax: parseInt(latest.raw_regime_argmax),
+        raw_argmax: parseInt(latest.raw_argmax),
       },
       probabilities,
       current_allocations: allocRows,
