@@ -47,7 +47,7 @@ jobs:
           python-version: '${{ matrix.python }}'
       - run: python -m pip install pytest==8.3.4 PyYAML==6.0.3
       - name: Offline event tests and workflow contracts
-        run: python -B -m pytest -q -p no:cacheprovider deployment/tests/test_event_ingestion.py deployment/tests/test_event_automation.py deployment/tests/test_event_feed_recovery.py
+        run: python -B -m pytest -q -p no:cacheprovider deployment/tests/test_event_ingestion.py deployment/tests/test_event_automation.py deployment/tests/test_event_feed_recovery.py deployment/tests/test_event_archives.py
 
   events:
     needs: offline-tests
