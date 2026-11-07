@@ -4,6 +4,7 @@ import json
 from deployment.events.database import EventDatabase
 from deployment.events.deduplication import EventDeduplicator
 from deployment.events.models import MacroEvent
+from deployment.events.sources.archive import verified_coverage
 
 # Retain full-title/date checks across category changes and a source URL hash for
 # revised titles. SSI makes NOT EXISTS safe across competing event collectors.
@@ -50,13 +51,27 @@ class EventStorage:
           ORDER BY log_id DESC
         """)
         checkpoints = {}
+        recovery_anchors = {}
         for row in rows:
             details = row['details']
             if isinstance(details, str):
                 details = json.loads(details)
             for name, value in (details or {}).get('source_status', {}).items():
-                if value.get('status') == 'OK' and name not in checkpoints:
+                if (value.get('status') == 'OK' and value.get('checkpoint_advanced') is True
+                        and verified_coverage(value.get('coverage_evidence',{}),name,
+                                              value['window']['start'],value['window']['end'])
+                        and name not in checkpoints):
                     checkpoints[name] = value['window']['end']
+                elif (value.get('status') == 'OK'
+                      and value.get('checkpoint_advanced') is not False
+                      and value.get('window',{}).get('end')):
+                    # Legacy RSS-only success is not proof, but discarding its
+                    # boundary could silently skip an outstanding recovery gap.
+                    # Retain the earliest such boundary until verified recovery.
+                    boundary = value['window']['end']
+                    recovery_anchors[name] = min(recovery_anchors.get(name,boundary),boundary)
+        for name, boundary in recovery_anchors.items():
+            checkpoints.setdefault(name,boundary)
         return checkpoints
 
     def start_run(self, run_id, session_date):
