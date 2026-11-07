@@ -10,7 +10,7 @@ from deployment.events.daily_collector import DailyEventCollector
 from deployment.events.sources.archive import (
     Page, discover, verified_coverage, months, OfficialSession, official_link)
 from deployment.events.sources.base import SourceError
-from deployment.events.sources import RBISource, SebiNseSource, MospiMofSource
+from deployment.events.sources import RBISource, SebiNseSource, MospiMofSource, FedUsSource
 from deployment.events.storage import EventStorage
 from deployment.tests.test_event_automation import Storage, event, coverage_fixture
 
@@ -51,9 +51,9 @@ class Session:
 
 
 def run(kind,responder,start=START,end=END):
-    source={'rbi':RBISource,'sebi':SebiNseSource,'pib':MospiMofSource}[kind]()
+    source={'rbi':RBISource,'sebi':SebiNseSource,'pib':MospiMofSource,'fed':FedUsSource}[kind]()
     session=Session(responder)
-    events=discover(source,start,end,kind,['monetary policy','derivative','inflation'],None,session=session)
+    events=discover(source,start,end,kind,['monetary policy','derivative','inflation','fomc statement'],None,session=session)
     return source,events,session
 
 
@@ -218,3 +218,24 @@ def test_receipt_rejects_missing_hash_wrong_source_and_partial_range():
     assert not verified_coverage(e,'RBI','2026-10-01',END)
     e['pages'][0]['response_sha256']='not-a-hash'
     assert not verified_coverage(e,'RBI',START,END)
+
+
+def fed_html(rows=None):
+    rows = rows if rows is not None else [('20261028a','20261028','HTML')]
+    return ('<html><body>'+''.join(f'<a href="/newsevents/pressreleases/monetary{dt_code}a.htm">{text}</a>' for id, dt_code, text in rows)+'</body></html>').encode()
+
+
+def test_fed_fomc_calendar_archive_proves_range():
+    def respond(url, data):
+        return fed_html([('20261028a','20261028','HTML'),('20260916a','20260916','HTML')])
+    source, events, session = run('fed', respond, '2026-10-09', '2026-11-08')
+    e = source.coverage_evidence
+    assert e['complete'] and e['pagination_complete'] and len(events) == 1
+    assert e['document_ids'] == ['20261028a']
+    assert verified_coverage(e, source.name, '2026-10-09', '2026-11-08')
+
+
+def test_fed_empty_calendar_fails_closed():
+    source, _, _ = run('fed', lambda u, d: b'<html>No links</html>', '2026-10-09', '2026-11-08')
+    assert not source.coverage_evidence['complete']
+    assert source.coverage_evidence['rejected_items']
