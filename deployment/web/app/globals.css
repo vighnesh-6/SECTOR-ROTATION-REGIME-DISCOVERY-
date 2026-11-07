@@ -3,13 +3,82 @@
 @tailwind utilities;
 
 :root {
-  --background: #020617;
-  --foreground: #f8fafc;
+  /* Institutional Light Theme (Terminal Paper Mode) */
+  --terminal-bg: #F8FAFC;
+  --terminal-panel: #FFFFFF;
+  --terminal-secondary: #F1F5F9;
+  --terminal-border: #CBD5E1;
+  --terminal-text-primary: #0F172A;
+  --terminal-text-secondary: #475569;
+
+  /* Universal Financial & Asset Semantic Colors */
+  --financial-positive: #16A34A;
+  --financial-negative: #DC2626;
+  --financial-neutral: #64748B;
+
+  /* Authoritative Sector Palette */
+  --sector-auto: #D97706;
+  --sector-bank: #2563EB;
+  --sector-fmcg: #059669;
+  --sector-it: #0891B2;
+  --sector-metal: #64748B;
+  --sector-pharma: #9333EA;
+  --sector-benchmark: #0F172A;
+}
+
+.dark {
+  /* Institutional Dark Theme (Terminal Night Mode - Default) */
+  --terminal-bg: #090D16;
+  --terminal-panel: #0F172A;
+  --terminal-secondary: #1E293B;
+  --terminal-border: #334155;
+  --terminal-text-primary: #F8FAFC;
+  --terminal-text-secondary: #94A3B8;
+
+  /* Universal Financial & Asset Semantic Colors */
+  --financial-positive: #22C55E;
+  --financial-negative: #EF4444;
+  --financial-neutral: #94A3B8;
+
+  /* Authoritative Sector Palette */
+  --sector-auto: #D97706;
+  --sector-bank: #2563EB;
+  --sector-fmcg: #059669;
+  --sector-it: #0891B2;
+  --sector-metal: #64748B;
+  --sector-pharma: #9333EA;
+  --sector-benchmark: #FFFFFF;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
+  color: var(--terminal-text-primary);
+  background-color: var(--terminal-bg);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* Enforce tabular digits across all financial figures and tables */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Clean institutional scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--terminal-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--terminal-border);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--terminal-text-secondary);
+}
