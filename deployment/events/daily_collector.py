@@ -11,10 +11,15 @@ from datetime import date, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
 
-from deployment.events.clock import now_ist
+from deployment.events.clock import now_ist, IST
 from deployment.events.storage import EventStorage
 from deployment.events.sources import RBISource, FedUsSource, MospiMofSource, SebiNseSource
-from deployment.events.sources.base import SourceError
+from deployment.events.sources.base import SourceError, FeedValidationError
+from deployment.events.diagnostics import exception_details, sanitize
+
+
+def _as_ist(value):
+    return value.replace(tzinfo=IST) if value.tzinfo is None else value.astimezone(IST)
 
 
 class DailyEventCollector:
@@ -27,14 +32,19 @@ class DailyEventCollector:
     def collect(self, days_back=14, start_date=None):
         if not 1 <= days_back <= 90:
             raise ValueError("Collection lookback must be 1..90 days")
-        now = self.clock()
+        now = _as_ist(self.clock())
         end = now.date()
+        floor = date(2019, 1, 1)
         explicit = date.fromisoformat(start_date) if start_date else None
-        if explicit and not max(date(2019, 1, 1), end-timedelta(days=90)) <= explicit <= end:
+        if explicit and not max(floor, end-timedelta(days=90)) <= explicit <= end:
             raise ValueError("Recovery start must be within the last 90 days")
+        requested_start = explicit or max(floor, end-timedelta(days=days_back))
+        requested_window = {'start':requested_start.isoformat(), 'end':end.isoformat()}
         run_id = str(uuid.uuid4())
         summary = {'run_id':run_id, 'status':'FAILED', 'dry_run':self.dry_run,
                    'started_at':now.isoformat(), 'new_events_inserted':0,
+                   'requested_lookback_days':days_back, 'manual_start_date':start_date,
+                   'requested_window':requested_window,
                    'candidates_found':0, 'duplicates_rejected':0, 'source_status':{}}
         started = time.monotonic()
         log_id = None
@@ -42,67 +52,112 @@ class DailyEventCollector:
             checkpoints = self.storage.source_checkpoints()
             if not self.dry_run:
                 log_id = self.storage.start_run(run_id, end.isoformat())
-            successful = 0
             for source in self.sources:
                 previous = checkpoints.get(source.name)
-                start = explicit or end-timedelta(days=days_back)
-                if previous:
-                    # Never move the cursor backwards, nor drop a failed source's gap.
-                    start = min(start, date.fromisoformat(previous)-timedelta(days=2))
-                window = {'start':start.isoformat(), 'end':end.isoformat()}
-                result = {'status':'ERROR', 'window':window}
+                result = {'status':'ERROR', 'previous_checkpoint':previous,
+                          'requested_lookback_days':days_back, 'requested_window':dict(requested_window),
+                          'checkpoint_extension_days':0, 'checkpoint_advanced':False}
                 summary['source_status'][source.name] = result
                 try:
+                    prior = date.fromisoformat(previous) if previous else None
+                    if prior and not floor <= prior <= end:
+                        raise ValueError('Saved source checkpoint is outside valid IST date bounds')
+                    start = min(requested_start, max(floor, prior-timedelta(days=2))) if prior else requested_start
+                    window = {'start':start.isoformat(), 'end':end.isoformat()}
+                    result.update(window=window, effective_window=dict(window),
+                                  checkpoint_extension_days=(requested_start-start).days,
+                                  effective_window_calendar_dates=(end-start).days+1)
                     if (end-start).days > 90:
-                        raise ValueError("RECOVERY_REQUIRED: gap exceeds 90 days")
-                    events = source.fetch_incremental(**{'start_date':window['start'],'end_date':window['end']})
+                        result.update(recovery_required=True, recovery_reason='bounded_window_exceeded',
+                                      recovery_action='Verify the missing official archive interval; do not move the checkpoint or run historical backfill')
+                        raise ValueError('RECOVERY_REQUIRED: checkpoint-driven window exceeds 90-day bound')
+                    # Avoid carrying successful metadata across failed retries on a reused adapter.
+                    if hasattr(source, 'feed_diagnostics'):
+                        source.feed_diagnostics = {}
+                    partial_error = None
+                    try:
+                        events = source.fetch_incremental(start_date=window['start'], end_date=window['end'])
+                    except FeedValidationError as exc:
+                        partial_error = exc
+                        details = exception_details(exc, source.name)
+                        result.update(details)
+                        result['feed_error'] = dict(details)
+                        # The adapter did not reach its date filter when parsing raised.
+                        # Retain only valid in-window events carried by the parser.
+                        events = [e for e in exc.events if window['start'] <= e.date <= window['end']]
                     oldest = getattr(source, 'oldest_publication', None)
-                    # RSS is not an archive. Fail visibly rather than advancing across
-                    # an outage that extends beyond the feed's available history.
-                    required = previous or (explicit.isoformat() if explicit else None)
-                    if required and (oldest is None or oldest > required):
-                        raise ValueError("RECOVERY_REQUIRED: feed no longer covers checkpoint")
+                    newest = getattr(source, 'newest_publication', None)
+                    diagnostics = getattr(source, 'feed_diagnostics', {}) or {}
+                    result.update(oldest_publication=oldest, newest_publication=newest,
+                                  feed_diagnostics=dict(diagnostics), events_fetched=len(events))
+                    summary['candidates_found'] += len(events)
+                    # Keep the previous checkpoint boundary protection. Optional older
+                    # lookback is reported independently; it is not proof of RSS history.
+                    required = previous or requested_start.isoformat()
+                    covered = oldest is not None and oldest <= required
+                    result['coverage'] = {
+                        'required_boundary':required, 'boundary_basis':'previous_checkpoint' if previous else 'requested_start',
+                        'oldest_publication':oldest, 'newest_publication':newest,
+                        'checkpoint_boundary_available':covered,
+                        'requested_window_available':oldest is not None and oldest <= requested_start.isoformat(),
+                        'effective_window_available':oldest is not None and oldest <= start.isoformat(),
+                        'evidence':'visible RSS publication bounds; not a complete archive guarantee'}
+                    if not covered:
+                        gap_end = min(end, date.fromisoformat(oldest)-timedelta(days=1)) if oldest else end
+                        result['coverage']['unavailable_window'] = {'start':required,'end':gap_end.isoformat()}
+                        result.update(recovery_required=True, recovery_reason='rss_retention_gap' if oldest else 'no_trustworthy_feed_dates',
+                                      recovery_action='Obtain validated official archive coverage for unavailable_window; retain previous checkpoint')
+                        raise ValueError('RECOVERY_REQUIRED: RSS retention does not reach the required boundary')
                     for event in events:
                         if not window['start'] <= event.date <= window['end'] or not event.raw_source_url:
-                            raise ValueError("Invalid incremental event")
+                            raise ValueError('Invalid incremental event')
                         event.__post_init__()
                     persisted = self.storage.persist_events(events, dry_run=self.dry_run)
                     inserted = persisted.get('inserted_count', 0)
-                    result.update(status='OK', events_fetched=len(events), inserted=inserted,
+                    result.update(status='PARTIAL' if partial_error else 'OK', inserted=inserted,
                                   would_insert=persisted.get('unique_to_insert',0),
                                   duplicates_rejected=persisted.get('duplicates_rejected',0),
-                                  oldest_publication=oldest,
+                                  checkpoint_advanced=not self.dry_run and not partial_error,
+                                  recovery_required=bool(partial_error),
                                   references=[{'source_id':e.source_id,'date':e.date,'url':e.raw_source_url} for e in events])
-                    summary['candidates_found'] += len(events)
+                    if partial_error:
+                        result.update(recovery_reason='rejected_feed_items',
+                                      recovery_action='Retry or obtain corrected official items; valid items are retained but the checkpoint is not advanced')
                     summary['new_events_inserted'] += inserted
                     summary['duplicates_rejected'] += persisted.get('duplicates_rejected',0)
-                    successful += 1
                 except Exception as exc:
-                    # Exception text can contain secrets from third-party/shared code.
-                    result['error_type'] = type(exc).__name__
-                    if isinstance(exc, SourceError):
-                        result['error'] = str(exc)  # controlled, sanitized source diagnostics
-                    result['recovery_required'] = isinstance(exc, ValueError) and str(exc).startswith('RECOVERY_REQUIRED:')
-            summary['status'] = 'SUCCESS' if successful == len(self.sources) and successful else ('PARTIAL' if successful else 'FAILED')
+                    result.update(exception_details(exc, source.name))
+                    # Preserve parser diagnostics even when fetching never returned.
+                    if getattr(source, 'feed_diagnostics', None):
+                        result['feed_diagnostics'] = dict(source.feed_diagnostics)
+                    result['recovery_required'] = result.get('recovery_required', False) or isinstance(exc, FeedValidationError)
+                    result['checkpoint_advanced'] = False
+            statuses = [r['status'] for r in summary['source_status'].values()]
+            summary['status'] = 'SUCCESS' if statuses and all(x=='OK' for x in statuses) else ('PARTIAL' if any(x in ('OK','PARTIAL') for x in statuses) else 'FAILED')
         except Exception as exc:
+            summary.update(exception_details(exc, 'collector'))
             summary['status'] = 'FAILED'
-            summary['error'] = type(exc).__name__
         finally:
-            summary['finished_at'] = self.clock().isoformat()
+            summary['finished_at'] = _as_ist(self.clock()).isoformat()
             summary['duration_ms'] = int((time.monotonic()-started)*1000)
+            summary = sanitize(summary)
             if log_id is not None:
                 try:
                     self.storage.finish_run(log_id, summary, summary['duration_ms'])
-                except Exception:
+                except Exception as exc:
+                    details = exception_details(exc, 'execution-log-finalization')
                     summary['status'] = 'FAILED'
                     summary['error'] = 'ExecutionLogFinalizeFailed'
+                    summary['logging_error'] = details
+                    for result in summary['source_status'].values():
+                        result['checkpoint_advanced'] = False
         return summary
 
 
 def check_health(storage=None, clock=now_ist):
     """Read-only source-success freshness, accounting for weekday schedules."""
     storage = storage if storage is not None else EventStorage()
-    now = clock()
+    now = _as_ist(clock())
     expected = now.date()
     if now.hour < 23:  # two-hour allowance for the 21:00 schedule
         expected -= timedelta(days=1)
@@ -128,7 +183,8 @@ def main(argv=None):
     try:
         result = check_health() if args.check_health else run_collector(args.days, not args.live, args.start_date)
     except Exception as exc:
-        result = {'status':'FAILED','error':type(exc).__name__}
+        result = {'status':'FAILED', **exception_details(exc, 'cli')}
+    result = sanitize(result)
     output = json.dumps(result, indent=2)
     print(output)
     # Runner-managed output is event-specific; no local output files by default.
