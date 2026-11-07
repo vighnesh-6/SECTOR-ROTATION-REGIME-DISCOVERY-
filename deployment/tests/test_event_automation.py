@@ -299,9 +299,23 @@ def test_isolation_guard_rejects_missing_or_production_target(value,monkeypatch)
 
 
 def test_isolation_guard_requires_explicit_confirmation(monkeypatch):
-    monkeypatch.setenv('EVENT_TEST_DATABASE_URL','postgresql://u:p@ep-test.ap-southeast-1.aws.neon.tech/neondb')
+    monkeypatch.setenv('EVENT_TEST_DATABASE_URL','postgresql://u:p@ep-cold-wind-a14dq44q.ap-southeast-1.aws.neon.tech/neondb')
     monkeypatch.delenv('EVENT_TEST_BRANCH_CONFIRMED',raising=False)
     with pytest.raises(ValueError): isolated_test_url()
+
+
+def test_isolation_guard_requires_exact_test_endpoint(monkeypatch):
+    monkeypatch.setenv('EVENT_TEST_DATABASE_URL','postgresql://u:p@ep-other-random.ap-southeast-1.aws.neon.tech/neondb')
+    monkeypatch.setenv('EVENT_TEST_BRANCH_CONFIRMED','true')
+    with pytest.raises(ValueError) as exc:
+        isolated_test_url()
+    assert 'endpoint must match test branch' in str(exc.value)
+
+
+def test_isolation_guard_accepts_valid_test_endpoint(monkeypatch):
+    monkeypatch.setenv('EVENT_TEST_DATABASE_URL','postgresql://u:p@ep-cold-wind-a14dq44q.ap-southeast-1.aws.neon.tech/neondb')
+    monkeypatch.setenv('EVENT_TEST_BRANCH_CONFIRMED','true')
+    assert 'ep-cold-wind-a14dq44q' in isolated_test_url()
 
 
 @pytest.mark.parametrize('status,exit_code',[('SUCCESS',0),('PARTIAL',1),('FAILED',1)])
