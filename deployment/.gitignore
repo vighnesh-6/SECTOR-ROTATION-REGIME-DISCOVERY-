@@ -1,0 +1,27 @@
+# Environment variables and secrets
+.env
+.env*.local
+.env.production
+.env.development
+
+# Neon context
+.neon/
+
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build
+.next/
+out/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Coverage
+coverage/
+*.lcov
+
