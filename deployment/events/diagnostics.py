@@ -26,6 +26,12 @@ def redact(value):
     text = re.sub(r'(?i)postgres(?:ql)?://[^\s\x22\x27<>]+', '[REDACTED_CONNECTION]', text)
     text = re.sub(r'(?i)(https?://)[^/\s:@]+:[^@\s]+@', r'\1[REDACTED]@', text)
     text = re.sub(r'(?i)(\b(?:Bearer|Basic)\s+)[^\s\x22\x27,;]+', r'\1[REDACTED]', text)
+    # JSON/Python mapping keys have a closing quote before the separator.
+    # Handle these independently of environment-known secret values, including
+    # escaped quotes inside the value, without losing the useful error context.
+    text = re.sub(
+        r'''(?i)((["'])(?:password|passwd|pwd|username|user|secret|token|client_secret|access_token|refresh_token|api[_-]?key|authorization|database_url|connection_string)\2\s*:\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}]+)''',
+        r'\1"[REDACTED]"', text)
     text = re.sub(r'(?i)((?:password|passwd|pwd|user(?:name)?|secret|token|api[_-]?key|authorization)\s*[=:]\s*)(?:\x22[^\x22]*\x22|\x27[^\x27]*\x27|[^\s&,;]+)', r'\1[REDACTED]', text)
     return re.sub(r'(?i)\bSECRET\b', '[REDACTED]', text)
 
