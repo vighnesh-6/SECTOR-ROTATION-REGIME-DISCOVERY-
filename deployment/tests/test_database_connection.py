@@ -58,7 +58,7 @@ def test_historical_migration_row_counts():
     }
     for table_name, expected_count in expected_baseline_counts.items():
         if table_name == "macro_events":
-            res = client.query(f"SELECT COUNT(*) as count FROM {table_name};")
+            res = client.query(f"SELECT COUNT(*) as count FROM {table_name} WHERE source LIKE 'ID: E%';")
         else:
             res = client.query(f"SELECT COUNT(*) as count FROM {table_name} WHERE date <= '2026-09-18';")
         actual_count = int(res[0]["count"])
