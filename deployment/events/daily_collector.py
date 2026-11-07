@@ -117,6 +117,11 @@ class DailyEventCollector:
                     result.update(oldest_publication=oldest, newest_publication=newest,
                                   feed_diagnostics=dict(diagnostics), events_fetched=len(events))
                     summary['candidates_found'] += len(events)
+                    if (not verified and diagnostics.get('total_items',0) > 0
+                            and diagnostics.get('valid_items') == 0):
+                        result.update(recovery_required=True, recovery_reason='unusable_feed',
+                                      recovery_action='Retry a corrected official feed or verify complete official archive coverage; retain previous checkpoint')
+                        raise ValueError('RECOVERY_REQUIRED: RSS contains no valid items; official archive coverage is unverified')
                     # Keep the previous checkpoint boundary protection. Optional older
                     # lookback is reported independently; it is not proof of RSS history.
                     required = previous or requested_start.isoformat()
