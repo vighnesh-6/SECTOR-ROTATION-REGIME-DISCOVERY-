@@ -39,8 +39,6 @@ export async function GET(request: NextRequest) {
     }
     simSql += ` ORDER BY date ASC, variant ASC;`;
 
-    const simRows = await queryNeon(simSql, params);
-
     // Fetch benchmark simulations over the same date range
     const benchSql = `
       SELECT 
@@ -52,7 +50,6 @@ export async function GET(request: NextRequest) {
       WHERE date >= $1 AND date <= $2
       ORDER BY date ASC, benchmark_name ASC;
     `;
-    const benchRows = await queryNeon(benchSql, [fromDate, toDate]);
 
     // Fetch latest current holdings per variant
     const latestHoldingsSql = `
@@ -71,7 +68,13 @@ export async function GET(request: NextRequest) {
       FROM portfolio_simulations_daily
       ORDER BY variant, date DESC;
     `;
-    const latestHoldings = await queryNeon(latestHoldingsSql);
+
+    // Execute all 3 independent queries in parallel
+    const [simRows, benchRows, latestHoldings] = await Promise.all([
+      queryNeon(simSql, params),
+      queryNeon(benchSql, [fromDate, toDate]),
+      queryNeon(latestHoldingsSql),
+    ]);
 
     return NextResponse.json({
       filters: { variant: variant || "ALL", from_date: fromDate, to_date: toDate },
@@ -87,4 +90,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-
