@@ -1,0 +1,19 @@
+{
+  "status": "VERIFIED_PARITY",
+  "verified_at_date": "2026-09-18",
+  "total_historical_rows": 1687,
+  "max_prob_diff": 1.3238504736889922e-10,
+  "label_mismatches": 0,
+  "hmm_diagnostics": {
+    "best_train_ll_per_obs": -36.110183173211205,
+    "transmat_diag_mean": 0.9707474405588054,
+    "stationary_dist": [
+      0.19164082007344851,
+      0.0314564448297816,
+      0.32763799685317024,
+      0.02123310029439729,
+      0.2722801923590521,
+      0.15575144559015017
+    ]
+  }
+}
