@@ -10,7 +10,8 @@ def isolated_test_url():
     value = os.environ.get('EVENT_TEST_DATABASE_URL', '').strip().strip('\'"')
     parsed = urlparse(value)
     production = urlparse(os.environ.get('DATABASE_URL', '').strip().strip('\'"'))
-    if os.environ.get('EVENT_TEST_BRANCH_CONFIRMED') != 'true':
+    confirmed = os.environ.get('EVENT_TEST_BRANCH_CONFIRMED', '').strip().strip('\'"')
+    if confirmed != 'true':
         raise ValueError('A separately confirmed isolated Neon branch is required: EVENT_TEST_BRANCH_CONFIRMED must be "true"')
     if parsed.scheme not in ('postgres', 'postgresql'):
         raise ValueError('A separately confirmed isolated Neon branch is required: scheme must be postgres or postgresql')
