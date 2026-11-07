@@ -15,16 +15,23 @@ defaults to disabled. Do not enable it until the following are verified:
    `EVENT_TEST_BRANCH_CONFIRMED=true`. The integration guard rejects the known
    production endpoint, same production endpoint with/without pooler, missing
    credentials, and absent confirmation. It cannot verify Neon branch ancestry;
-   the operator must confirm isolation in Neon. No test database is auto-created.
+   the operator must confirm isolation in Neon. The supplied local test connection
+   has now been independently verified as branch `br-odd-star-a1hjl6dl`, endpoint
+   `ep-cold-wind-a14dq44q`. No test database is auto-created.
 2. Repository Actions has `DATABASE_URL` or `NEON_DATABASE_URL` for production.
    No Neon management API key is required for the current HTTP SQL transport.
-3. The offline matrix passes on Python 3.11 and 3.13 in Actions. Locally available
-   Python is 3.13.5; local 3.11 execution has not been verified.
+3. The offline matrix must pass on Python 3.11 and 3.13 in Actions. Local tests
+   now also run on a temporary official Python 3.11.9 embeddable runtime and the
+   installed Python 3.13.5. The temporary runtime is removed after verification;
+   no installed interpreter or project configuration is changed.
 4. Official source probes and a manual dry run succeed. In the implementation
    session RBI, Fed and SEBI parsed successfully. PIB returned Hindi RSS items
    without publication dates even with the advertised English query parameters;
    a separate official MOSPI RSS probe failed. MOSPI/PIB coverage is **blocked**,
-   not silently classified as a successful empty source. Do not invent dates,
+   not silently classified as a successful empty source. Items are now validated
+   individually: valid dated events survive invalid siblings, but rejected-item
+   counts/reasons remain visible and the source cannot advance its checkpoint.
+   Do not invent dates,
    ingest static historical lists, disable TLS checks, or enable production until
    a functioning official dated feed/approved adapter resolves this blocker.
 5. Run the isolated persistence verification, inspect preservation/concurrency
@@ -68,8 +75,9 @@ unique constraint or modifying the schema. All writers must use the guarded
 path; arbitrary external SQL writers are outside this concurrency contract.
 Ambiguous HTTP outcomes are retried with the same conditional inserts; insertion
 counts in the eventual response may exclude rows committed before a lost response.
-PostgreSQL SSI, SQL syntax, concurrent execution and preservation against actual
-Neon remain subject to the isolated integration verification.
+PostgreSQL SSI, SQL syntax, concurrent execution and preservation have been tested
+against the isolated Neon branch, without connecting to production. Reused string
+parameters in the INSERT projection are explicitly cast to text to avoid 42P08.
 
 Live runs create their own `pipeline_execution_logs` row using RETURNING log_id,
 and update only that newly created row. Existing logs are not rewritten. Dry run
@@ -77,19 +85,37 @@ and health modes issue no database writes, including no execution-log writes.
 
 Each successful source's end date is recovered from completed event logs. Failed
 sources retain their previous cursor. Requests overlap the cursor by at least two
-days. A gap beyond feed retention or 90 days fails with `recovery_required=true`;
+days. Requested lookback, requested window, previous checkpoint, effective window,
+extension days, visible oldest/newest RSS dates, and unavailable intervals are
+reported separately. The parser already calculated `oldest_publication`; it is
+not replaced with a guessed date or the oldest policy-only event. A gap beyond
+feed retention or 90 days fails with `recovery_required=true`;
 the cursor does not advance. Official archive recovery requires a source capable
 of supplying that window, and must not use the historical backfill runner. Until
-then other sources can progress with a PARTIAL status. The first run scans the
-recent 14-day window, not the historical project period. RSS retention is not a
-guarantee of complete historical event coverage.
+then other sources can progress with a PARTIAL status. With no checkpoint, the
+requested start is the required bootstrap boundary; unavailable initial history
+is explicitly blocked rather than silently treated as covered. Existing-checkpoint
+protection is unchanged: optional older lookback can be unavailable if the actual
+checkpoint boundary is covered, and this distinction is reported. RSS retention
+is not a guarantee of complete historical event coverage.
+
+Every rejected RSS item is counted with a stable reason and item position (the
+detail list is capped at 20, counts are not). Entirely invalid feeds fail; mixed
+feeds retain valid in-window events only when coverage protection passes, remain
+PARTIAL, and retain the previous checkpoint. Retrying corrected feeds is
+idempotent. No archive recovery is fabricated from static historical lists.
+
+Exception messages and nested diagnostics are sanitized before execution logging
+or summaries. In GitHub Actions, full chained tracebacks (without captured locals)
+are redacted before emission. Connection URLs, credentials, environment secrets,
+Bearer/Basic authorization values and common key/value secret formats are masked.
 
 ## Validation commands
 
 From repository root with the chosen interpreter, disable bytecode/cache writes:
 
 ```
-python -B -m pytest -q -p no:cacheprovider deployment/tests/test_event_ingestion.py deployment/tests/test_event_automation.py
+python -B -m pytest -q -p no:cacheprovider deployment/tests/test_event_ingestion.py deployment/tests/test_event_automation.py deployment/tests/test_event_feed_recovery.py
 python -B -m deployment.events.daily_collector --days 14
 python -B -m deployment.events.daily_collector --check-health
 ```
@@ -114,12 +140,20 @@ production. Missing isolation configuration fails before creating a client.
 ## Current local evidence
 
 - Existing and new offline event tests pass (see final task report for count).
-- Python 3.11 syntax compatibility and local 3.13 imports are checked separately.
+- Actual Python 3.11.9 and 3.13.5 offline execution is checked, as well as 3.11 syntax.
 - Workflow YAML and safety contracts are tested locally; actionlint and actual
   GitHub execution are not verified here.
-- No production or test-branch database writes were performed in this session.
-- No actual 230-row preservation or live concurrency claim is made from mocks.
-- Missing test branch and GitHub access prevent remote production completion.
+- The isolated test branch passed persistence, concurrent insertion, duplicate
+  prevention, partial-feed retry/checkpoint behaviour, lost-acknowledgement recovery,
+  and transaction rollback checks. Test-created fixtures/logs were cleaned up;
+  all 230 pre-existing event rows were compared and preserved exactly. Sequences
+  were not reset. No production database was accessed.
+- Live RBI/SEBI feeds exposed oldest dates of 2026-11-06 during diagnosis; no
+  source checkpoints existed in the isolated branch. No production checkpoint
+  dates are claimed or queried. Older saved-cursor gaps are regression-tested.
+- GitHub secrets, live workflow execution, and repository enable-variable state
+  remain unverified. Production collection was not enabled. PIB's undated feed
+  and any unavailable official archive intervals remain deployment blockers.
 
 ## Implementation references
 
