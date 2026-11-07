@@ -16,6 +16,7 @@ from deployment.events.storage import EventStorage
 from deployment.events.sources import RBISource, FedUsSource, MospiMofSource, SebiNseSource
 from deployment.events.sources.base import SourceError, FeedValidationError
 from deployment.events.diagnostics import exception_details, sanitize
+from deployment.events.sources.archive import verified_coverage
 
 
 def _as_ist(value):
@@ -74,6 +75,7 @@ class DailyEventCollector:
                     # Avoid carrying successful metadata across failed retries on a reused adapter.
                     if hasattr(source, 'feed_diagnostics'):
                         source.feed_diagnostics = {}
+                    source.coverage_evidence = {}
                     partial_error = None
                     try:
                         events = source.fetch_incremental(start_date=window['start'], end_date=window['end'])
@@ -85,6 +87,30 @@ class DailyEventCollector:
                         # The adapter did not reach its date filter when parsing raised.
                         # Retain only valid in-window events carried by the parser.
                         events = [e for e in exc.events if window['start'] <= e.date <= window['end']]
+                    except SourceError as exc:
+                        partial_error = exc
+                        result['feed_error'] = exception_details(exc, source.name)
+                        events = []
+                    # Official catalogue enumeration is independent of recent RSS.
+                    # A complete receipt replaces the RSS candidate set, never merges
+                    # undated RSS items into an allegedly complete source.
+                    archive = getattr(source, 'recover_official_interval', None)
+                    archive_events = []
+                    if callable(archive):
+                        try:
+                            archive_events = archive(window['start'], window['end'])
+                        except Exception as exc:
+                            result['archive_error'] = exception_details(exc, source.name+' archive')
+                    evidence = getattr(source, 'coverage_evidence', {}) or {}
+                    verified = verified_coverage(evidence, source.name, window['start'], window['end'])
+                    if evidence:
+                        result['coverage_evidence'] = evidence
+                    if verified:
+                        events = archive_events
+                        partial_error = None
+                        result['feed_resolution'] = 'replaced_by_verified_official_catalogue'
+                        result.pop('error', None)
+                        result.pop('error_type', None)
                     oldest = getattr(source, 'oldest_publication', None)
                     newest = getattr(source, 'newest_publication', None)
                     diagnostics = getattr(source, 'feed_diagnostics', {}) or {}
@@ -94,13 +120,16 @@ class DailyEventCollector:
                     # Keep the previous checkpoint boundary protection. Optional older
                     # lookback is reported independently; it is not proof of RSS history.
                     required = previous or requested_start.isoformat()
-                    covered = oldest is not None and oldest <= required
+                    rss_boundary_available = oldest is not None and oldest <= required
+                    covered = verified or rss_boundary_available
                     result['coverage'] = {
                         'required_boundary':required, 'boundary_basis':'previous_checkpoint' if previous else 'requested_start',
                         'oldest_publication':oldest, 'newest_publication':newest,
-                        'checkpoint_boundary_available':covered,
-                        'requested_window_available':oldest is not None and oldest <= requested_start.isoformat(),
-                        'effective_window_available':oldest is not None and oldest <= start.isoformat(),
+                        'checkpoint_boundary_available':rss_boundary_available,
+                        'verified_complete':verified,
+                        'verification_method':'official_catalogue' if verified else 'unverified_rss_bounds',
+                        'requested_window_available':verified or (oldest is not None and oldest <= requested_start.isoformat()),
+                        'effective_window_available':verified or (oldest is not None and oldest <= start.isoformat()),
                         'evidence':'visible RSS publication bounds; not a complete archive guarantee'}
                     if not covered:
                         gap_end = min(end, date.fromisoformat(oldest)-timedelta(days=1)) if oldest else end
@@ -114,15 +143,18 @@ class DailyEventCollector:
                         event.__post_init__()
                     persisted = self.storage.persist_events(events, dry_run=self.dry_run)
                     inserted = persisted.get('inserted_count', 0)
-                    result.update(status='PARTIAL' if partial_error else 'OK', inserted=inserted,
+                    result.update(status='OK' if verified else 'PARTIAL', inserted=inserted,
                                   would_insert=persisted.get('unique_to_insert',0),
                                   duplicates_rejected=persisted.get('duplicates_rejected',0),
-                                  checkpoint_advanced=not self.dry_run and not partial_error,
-                                  recovery_required=bool(partial_error),
+                                  checkpoint_advanced=not self.dry_run and verified,
+                                  recovery_required=not verified,
                                   references=[{'source_id':e.source_id,'date':e.date,'url':e.raw_source_url} for e in events])
-                    if partial_error:
-                        result.update(recovery_reason='rejected_feed_items',
+                    if not verified:
+                        result.update(recovery_reason='rejected_feed_items' if partial_error else 'coverage_evidence_required',
                                       recovery_action='Retry or obtain corrected official items; valid items are retained but the checkpoint is not advanced')
+                    if evidence:
+                        evidence['existing_event_duplicates'] = persisted.get('duplicates_rejected',0)
+                        evidence['would_insert'] = persisted.get('unique_to_insert',0) if self.dry_run else inserted
                     summary['new_events_inserted'] += inserted
                     summary['duplicates_rejected'] += persisted.get('duplicates_rejected',0)
                 except Exception as exc:
