@@ -35,14 +35,14 @@ def test_research_directories_untouched():
     )
     assert result_status.returncode == 0
 
-    lines = result_status.stdout.strip().split("\n")
+    lines = result_status.stdout.splitlines()
     modified_outside_deployment = []
 
     for line in lines:
         if not line.strip():
             continue
         status = line[:2]
-        filepath = line[3:].strip().strip('"')
+        filepath = line[2:].strip().strip('"')
 
         # Only check modified (' M', 'M ', 'MM') or deleted (' D', 'D ') status
         if any(c in status for c in ["M", "D", "A", "R", "C"]) and not filepath.startswith("deployment/"):
