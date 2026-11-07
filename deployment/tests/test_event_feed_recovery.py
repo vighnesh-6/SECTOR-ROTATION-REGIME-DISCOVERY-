@@ -8,12 +8,19 @@ import pytest
 from deployment.events.clock import IST
 from deployment.events.daily_collector import DailyEventCollector, main
 from deployment.events.diagnostics import redact, sanitize
-from deployment.events.sources.base import FeedValidationError
+from deployment.events.sources.base import FeedValidationError, SourceError
 from deployment.events.sources.rbi import RBISource
 from deployment.events.sources.sebi_nse import SebiNseSource
 from deployment.events.sources.mospi_mof import MospiMofSource
 from deployment.events.storage import EventStorage
-from deployment.tests.test_event_automation import Storage, Source, event
+from deployment.tests.test_event_automation import Storage, Source, event, coverage_fixture
+
+@pytest.fixture(autouse=True)
+def offline_catalogues(monkeypatch):
+    # RSS regression fixtures do not include catalogue pages. Never use the network.
+    def unavailable(*args,**kwargs): raise SourceError('No archive fixture supplied')
+    monkeypatch.setattr('deployment.events.sources.archive.OfficialSession.request',unavailable)
+
 
 NOW = datetime(2026, 11, 8, 1, tzinfo=IST)
 
@@ -54,11 +61,11 @@ def test_checkpoint_covered_but_optional_older_lookback_is_reported(adapter,host
     with patch.object(source,'_http_get',return_value=rss(item(title,link='https://'+host+'/release'))):
         result=DailyEventCollector(False,storage,[source],lambda:NOW).collect()
     detail=result['source_status'][source.name]
-    assert result['status']=='SUCCESS'
+    assert result['status']=='PARTIAL'
     assert detail['coverage']['checkpoint_boundary_available']
     assert not detail['coverage']['requested_window_available']
     assert detail['previous_checkpoint']=='2026-11-06'
-    assert detail['checkpoint_advanced']
+    assert not detail['checkpoint_advanced']  # RSS dates alone are no longer proof.
 
 
 def test_undated_first_item_does_not_discard_later_valid_pib_event():
@@ -123,16 +130,19 @@ def test_partial_retry_deduplicates_and_only_clean_run_advances():
     collector=DailyEventCollector(False,storage,[source],lambda:NOW)
     with patch.object(source,'_http_get',return_value=rss(item(),item(published=''))): first=collector.collect()
     with patch.object(source,'_http_get',return_value=rss(item())): second=collector.collect()
-    assert first['status']=='PARTIAL' and second['status']=='SUCCESS'
+    assert first['status']=='PARTIAL' and second['status']=='PARTIAL'
     assert second['new_events_inserted']==0 and second['duplicates_rejected']==1
     assert not first['source_status'][source.name]['checkpoint_advanced']
-    assert second['source_status'][source.name]['checkpoint_advanced']
+    assert not second['source_status'][source.name]['checkpoint_advanced']
 
 
 def test_partial_source_checkpoint_is_not_recovered_from_execution_log():
     db=MagicMock()
     db.query.return_value=[{'details':{'source_status':{'PIB':{'status':'PARTIAL','window':{'end':'2026-11-08'}}}}},
                            {'details':{'source_status':{'PIB':{'status':'OK','window':{'end':'2026-11-06'}}}}}]
+    older=db.query.return_value[1]['details']['source_status']['PIB']
+    older['window']['start']='2026-11-06';older['checkpoint_advanced']=True
+    older['coverage_evidence']=coverage_fixture('PIB','2026-11-06','2026-11-06')
     assert EventStorage(db).source_checkpoints()=={'PIB':'2026-11-06'}
 
 
