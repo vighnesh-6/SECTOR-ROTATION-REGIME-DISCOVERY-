@@ -245,3 +245,56 @@ def test_cli_exception_reports_useful_sanitized_message(monkeypatch,capsys):
 def test_nested_diagnostics_are_redacted(monkeypatch):
     monkeypatch.setenv('ALERT_SECRET','sensitive-alert-value')
     assert sanitize({'sources':[{'message':'sensitive-alert-value'}]})=={'sources':[{'message':'[REDACTED]'}]}
+
+
+def test_all_invalid_official_references_fail_even_with_trustworthy_feed_dates():
+    source=MospiMofSource();storage=Storage({source.name:'2026-11-06'})
+    with patch.object(source,'_http_get',return_value=rss(item(link='https://unofficial.invalid/release'))):
+        result=DailyEventCollector(False,storage,[source],lambda:NOW).collect()
+    detail=result['source_status'][source.name]
+    assert result['status']=='FAILED' and detail['status']=='ERROR'
+    assert detail['feed_diagnostics']['valid_items']==0
+    assert detail['oldest_publication']=='2026-11-06'
+    assert detail['recovery_reason']=='unusable_feed'
+    assert not detail['checkpoint_advanced'] and not storage.seen
+
+
+@pytest.mark.parametrize('message',[
+    '{"password": "not-in-environment"}',
+    "{'api_key': 'not-in-environment'}",
+    '{"access_token":"not-in-environment","reason":"feed refused"}',
+    '{"client_secret":"not-in-environment"}',
+    r'{"password":"not-in-environment\"escaped"}',
+])
+def test_quoted_secret_keys_are_redacted_without_environment_registration(message):
+    output=redact(message)
+    assert 'not-in-environment' not in output and 'escaped' not in output
+    assert '[REDACTED]' in output
+
+
+def test_source_value_error_preserves_context_and_redacts_mapping_in_actions(monkeypatch,capsys):
+    monkeypatch.setenv('GITHUB_ACTIONS','true')
+    source=Source(error=ValueError('Feed date invalid: {"password":"unregistered-credential"}'))
+    result=DailyEventCollector(storage=Storage(),sources=[source],clock=lambda:NOW).collect()
+    detail=result['source_status'][source.name]
+    stderr=capsys.readouterr().err
+    assert detail['error_type']=='ValueError' and 'Feed date invalid' in detail['error']
+    assert 'Traceback' in stderr and 'ValueError' in stderr
+    assert 'unregistered-credential' not in json.dumps(result)+stderr
+
+
+def test_fourteen_day_request_and_october_ninth_checkpoint_extension_are_distinct():
+    source=Source();result=DailyEventCollector(storage=Storage({'RBI':'2026-10-11'}),sources=[source],clock=lambda:NOW).collect(14)
+    detail=result['source_status']['RBI']
+    assert result['manual_start_date'] is None
+    assert detail['requested_window']=={'start':'2026-10-25','end':'2026-11-08'}
+    assert detail['effective_window']=={'start':'2026-10-09','end':'2026-11-08'}
+    assert detail['checkpoint_extension_days']==16
+
+
+def test_manual_october_ninth_start_does_not_claim_checkpoint_extension():
+    result=DailyEventCollector(storage=Storage(),sources=[Source()],clock=lambda:NOW).collect(14,start_date='2026-10-09')
+    detail=result['source_status']['RBI']
+    assert result['manual_start_date']=='2026-10-09' and detail['previous_checkpoint'] is None
+    assert detail['requested_window']==detail['effective_window']=={'start':'2026-10-09','end':'2026-11-08'}
+    assert detail['checkpoint_extension_days']==0
