@@ -64,8 +64,8 @@ jobs:
         shell: bash
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL || secrets.NEON_DATABASE_URL }}
-          EVENT_TEST_DATABASE_URL: ${{ secrets.EVENT_TEST_DATABASE_URL }}
-          EVENT_TEST_BRANCH_CONFIRMED: ${{ vars.EVENT_TEST_BRANCH_CONFIRMED }}
+          EVENT_TEST_DATABASE_URL: ${{ secrets.EVENT_TEST_DATABASE_URL || vars.EVENT_TEST_DATABASE_URL }}
+          EVENT_TEST_BRANCH_CONFIRMED: ${{ vars.EVENT_TEST_BRANCH_CONFIRMED || secrets.EVENT_TEST_BRANCH_CONFIRMED }}
           EVENT_AUTOMATION_ENABLED: ${{ vars.EVENT_AUTOMATION_ENABLED }}
           REQUESTED_MODE: ${{ inputs.mode }}
           REQUESTED_DAYS: ${{ inputs.days }}
@@ -77,8 +77,21 @@ jobs:
           if [[ "$EVENT_SCHEDULE" == '30 17 * * 1-5' ]]; then mode=health; fi
           if [[ "$mode" == test-live ]]; then
             python -m pip install pytest==8.3.4
-            python -B -m pytest -q -p no:cacheprovider deployment/tests/test_event_neon_persistence.py
-            exit 0
+            echo "### Event Automation: Test-Live Persistence Verification" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+            echo "Target branch: \`br-odd-star-a1hjl6dl\` (endpoint: \`ep-cold-wind-a14dq44q\`)" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+            if python -B -m pytest -v -p no:cacheprovider deployment/tests/test_event_neon_persistence.py 2>&1 | tee test_live_output.log; then
+              echo "✅ Test-live isolated persistence verification succeeded." >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+              echo '```' >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+              cat test_live_output.log >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+              echo '```' >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+              exit 0
+            else
+              echo "❌ Test-live isolated persistence verification failed." >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+              echo '```' >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+              cat test_live_output.log >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+              echo '```' >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+              exit 1
+            fi
           fi
           if [[ -z "$DATABASE_URL" ]]; then
             echo '::error::Production database secret is missing.'
