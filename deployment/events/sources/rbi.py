@@ -94,6 +94,10 @@ class RBISource(BaseEventSource):
     def fetch_incremental(self, start_date, end_date):
         return [event for event in self.fetch_live_rss() if start_date <= event.date <= end_date]
 
+    def recover_official_interval(self, start_date, end_date):
+        from deployment.events.sources.archive import discover
+        return discover(self, start_date, end_date, 'rbi', ['monetary policy', 'repo rate', 'mpc', 'financial stability', 'liquidity adjustment', 'policy stance'], 'Monetary policy')
+
     def fetch_events(self, start_date: str, end_date: str) -> List[MacroEvent]:
         """
         Returns verified historical MPC decisions and newly published live RSS events
