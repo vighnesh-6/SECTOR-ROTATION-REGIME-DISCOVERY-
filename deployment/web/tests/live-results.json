@@ -1,0 +1,273 @@
+{
+  "base": "http://127.0.0.1:3210",
+  "routes": [
+    {
+      "path": "/",
+      "status": 200
+    },
+    {
+      "path": "/sector-rotation",
+      "status": 200
+    },
+    {
+      "path": "/portfolio-analytics",
+      "status": 200
+    },
+    {
+      "path": "/risk-drawdown",
+      "status": 200
+    },
+    {
+      "path": "/economic-calendar",
+      "status": 200
+    },
+    {
+      "path": "/event-intelligence",
+      "status": 200
+    },
+    {
+      "path": "/regime-intelligence",
+      "status": 200
+    },
+    {
+      "path": "/research-methodology",
+      "status": 200
+    }
+  ],
+  "apis": [
+    {
+      "path": "/api/v1/health",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/regime/latest",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/regime/history?from_date=2025-01-02&to_date=2026-09-18",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/rrg?trail=5",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=50",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=50&offset=50",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Banking%20crisis",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Commodity%20%2F%20energy%20policy",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Domestic%20market%20shock",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Domestic%20policy",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Elections",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=European%20monetary%20policy",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Fiscal%20%2F%20corporate%20policy",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Geopolitical",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Geopolitical%20%2F%20domestic%20shock",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Global%20financial%20shock",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Global%20market%20shock",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Global%20trade%20%2F%20FX%20shock",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Global%20trade%20policy",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Global%20trade%20policy%20%2F%20geopolitics",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Indian%20policy",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=International%20summit",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Japan%20monetary%20%2F%20global%20market%20shock",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Japan%20monetary%20policy",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Monetary%20%2F%20crisis%20response",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Monetary%20policy",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Natural%20disaster%20%2F%20market%20shock",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Pandemic",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Pandemic%20%2F%20domestic%20policy",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Pandemic%20%2F%20economic%20reopening",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Pandemic%20%2F%20market%20shock",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Political%20shock",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Trade%20%2F%20FTA",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=Trade%20policy",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=US%20monetary%20policy",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/events?limit=1&category=US%20monetary%20policy%20%2F%20banking",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/portfolios?period=train",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/portfolios?period=holdout",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/portfolios?period=post",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/portfolios?period=full",
+      "status": 200
+    },
+    {
+      "path": "/api/v1/portfolios?variant=INVALID",
+      "status": 400
+    },
+    {
+      "path": "/api/v1/events?limit=NaN",
+      "status": 400
+    },
+    {
+      "path": "/api/v1/rrg?trail=0",
+      "status": 400
+    },
+    {
+      "path": "/api/v1/regime/history?from_date=2026-02-30",
+      "status": 400
+    }
+  ],
+  "metric_comparisons": [
+    {
+      "variant": "1A",
+      "period": "train",
+      "intervals": 1264,
+      "six_metrics": "MATCH within 1e-5 absolute tolerance"
+    },
+    {
+      "variant": "1B",
+      "period": "train",
+      "intervals": 1264,
+      "six_metrics": "MATCH within 1e-5 absolute tolerance"
+    },
+    {
+      "variant": "2A",
+      "period": "train",
+      "intervals": 1264,
+      "six_metrics": "MATCH within 1e-5 absolute tolerance"
+    },
+    {
+      "variant": "2B",
+      "period": "train",
+      "intervals": 1264,
+      "six_metrics": "MATCH within 1e-5 absolute tolerance"
+    },
+    {
+      "variant": "1A",
+      "period": "holdout",
+      "intervals": 422,
+      "six_metrics": "MATCH within 1e-5 absolute tolerance"
+    },
+    {
+      "variant": "1B",
+      "period": "holdout",
+      "intervals": 422,
+      "six_metrics": "MATCH within 1e-5 absolute tolerance"
+    },
+    {
+      "variant": "2A",
+      "period": "holdout",
+      "intervals": 422,
+      "six_metrics": "MATCH within 1e-5 absolute tolerance"
+    },
+    {
+      "variant": "2B",
+      "period": "holdout",
+      "intervals": 422,
+      "six_metrics": "MATCH within 1e-5 absolute tolerance"
+    }
+  ],
+  "notes": [
+    {
+      "health": "DEGRADED",
+      "reasons": [
+        "Latest Market EOD execution is missing or not SUCCESS"
+      ]
+    }
+  ]
+}
