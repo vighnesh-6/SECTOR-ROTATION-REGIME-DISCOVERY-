@@ -14,7 +14,7 @@ interface SectorRRG {
   current_ratio: number;
   current_momentum: number;
   quadrant: "Leading" | "Weakening" | "Lagging" | "Improving";
-  trail: Array<{ date: string; ratio: number; momentum: number }>;
+  trail: Array<{ date: string; rs_ratio: number; rs_momentum: number }>;
 }
 
 interface RRGResponse {
@@ -156,9 +156,10 @@ export default function SectorRotationPage() {
   // Coordinate scaling for 500x500 SVG canvas
   // X range: 94 to 106 (center 100)
   // Y range: 94 to 106 (center 100)
+  const extent = Math.max(10, ...tableData.flatMap(({data:s}) => [s.current_ratio,s.current_momentum,...s.trail.flatMap(t=>[t.rs_ratio,t.rs_momentum])]).map(v=>Math.abs(v-100))) * 1.15;
   const mapCoord = (ratio: number, momentum: number) => {
-    const minVal = 95;
-    const maxVal = 105;
+    const minVal = 100-extent;
+    const maxVal = 100+extent;
     const size = 500;
     const padding = 40;
     const innerSize = size - 2 * padding;
@@ -179,7 +180,7 @@ export default function SectorRotationPage() {
     <div className="space-y-5">
       <SectionHeader
         title="Sector Rotation Intelligence & Relative Rotation Graph (RRG)"
-        description="JdK Relative Rotation Graph &bull; Benchmark: NIFTY 50 &bull; 50-Day Normalized Relative Strength vs 10-Day Momentum"
+        description="Standardized relative-strength rotation &bull; Benchmark: NIFTY 50 &bull; 50-Day Normalized Relative Strength vs 10-Day Momentum"
         badge={
           <StatusBadge
             label="RELATIVE STRENGTH MODEL"
@@ -189,7 +190,7 @@ export default function SectorRotationPage() {
         action={
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-mono text-terminal-muted hidden sm:inline">
-              Session: {data?.latest_date || "2026-11-06"}
+              Session: {data?.latest_date || "—"}
             </span>
             <button
               onClick={() => {
@@ -270,6 +271,7 @@ export default function SectorRotationPage() {
               <div className="relative w-full aspect-square max-w-[500px] mx-auto bg-terminal-secondary/30 rounded-sm border border-terminal-border/80 overflow-hidden select-none">
                 <svg
                   viewBox="0 0 500 500"
+                  role="img" aria-label="Six-sector standardized relative-strength rotation with dated trails"
                   className="w-full h-full"
                 >
                   {/* Quadrant Background Tints */}
@@ -355,7 +357,7 @@ export default function SectorRotationPage() {
                   {tableData.map(({ sector, data: sData }) => {
                     const color = SECTOR_COLORS[sector] || "#94A3B8";
                     const isHovered = hoveredSector === sector;
-                    const trailPoints = (sData.trail || []).map((t) => mapCoord(t.ratio, t.momentum));
+                    const trailPoints = (sData.trail || []).map((t) => mapCoord(t.rs_ratio, t.rs_momentum));
                     const currentPos = mapCoord(sData.current_ratio, sData.current_momentum);
 
                     // Polyline points string
@@ -365,11 +367,17 @@ export default function SectorRotationPage() {
                     return (
                       <g
                         key={sector}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`${sector}: ratio ${sData.current_ratio}, momentum ${sData.current_momentum}, ${sData.quadrant}`}
+                        onFocus={() => setHoveredSector(sector)}
+                        onBlur={() => setHoveredSector(null)}
                         onMouseEnter={() => setHoveredSector(sector)}
                         onMouseLeave={() => setHoveredSector(null)}
                         className="cursor-pointer transition-opacity"
                         opacity={hoveredSector && !isHovered ? 0.3 : 1}
                       >
+                        <title>{`${sector} · ${data?.latest_date} · ${sData.quadrant} · RS ${sData.current_ratio} / momentum ${sData.current_momentum}`}</title>
                         {/* Connecting Trailing Line */}
                         {allPoints.length > 1 && (
                           <polyline
@@ -438,7 +446,7 @@ export default function SectorRotationPage() {
           <div className="lg:col-span-6 flex flex-col">
             <TerminalPanel
               title="Sector Rotation Status Matrix"
-              subtitle="50-Day JdK RS-Ratio vs 10-Day RS-Momentum"
+              subtitle="50-Day standardized RS-Ratio vs 10-Day RS-Momentum"
               headerRight={
                 <span className="text-[11px] font-mono text-terminal-muted">
                   6 Authoritative Sectors
@@ -467,7 +475,7 @@ export default function SectorRotationPage() {
             </span>
           </div>
           <p className="text-[11px] text-terminal-muted leading-relaxed">
-            RS-Ratio ≥ 100, Momentum ≥ 100. Strong relative outperformance accelerating against NIFTY 50. Primary candidate for active long exposure.
+            RS-Ratio ≥ 100, Momentum ≥ 100. Strong relative outperformance accelerating against NIFTY 50. Descriptive positioning; portfolio permissions remain regime-driven.
           </p>
         </div>
 
@@ -491,7 +499,7 @@ export default function SectorRotationPage() {
             </span>
           </div>
           <p className="text-[11px] text-terminal-muted leading-relaxed">
-            RS-Ratio &lt; 100, Momentum &lt; 100. Trailing benchmark performance with negative momentum. Subordinate allocation or zero-weight target.
+            RS-Ratio &lt; 100, Momentum &lt; 100. Trailing benchmark performance with negative momentum. This descriptive quadrant does not change portfolio weights.
           </p>
         </div>
 

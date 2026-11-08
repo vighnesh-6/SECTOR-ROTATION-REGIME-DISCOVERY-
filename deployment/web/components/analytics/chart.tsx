@@ -1,0 +1,10 @@
+'use client';
+import {Area,AreaChart,Line,LineChart,CartesianGrid,Legend,ResponsiveContainer,Tooltip,XAxis,YAxis} from 'recharts';
+import { EmptyState } from '@/components/ui/empty-state';
+export const COLORS=['#34d399','#60a5fa','#fbbf24','#c084fc','#fb7185','#22d3ee','#94a3b8'];
+export function ResearchChart({data,keys,percent=false,stacked=false,label}:{data:Record<string,any>[];keys:string[];percent?:boolean;stacked?:boolean;label:string}){
+  if(!data.length)return <EmptyState title="No observations" description="No data is available for this selected window."/>;
+  const shared={data,margin:{top:12,right:20,bottom:12,left:12}};
+  const axes=<><CartesianGrid stroke="var(--terminal-border)" strokeDasharray="3 3" vertical={false}/><XAxis dataKey="date" minTickGap={75} tick={{fontSize:10,fill:'var(--terminal-text-secondary)'}} tickFormatter={v=>String(v).slice(0,10)} axisLine={false} tickLine={false}/><YAxis width={62} tick={{fontSize:10,fill:'var(--terminal-text-secondary)'}} tickFormatter={v=>`${Number(v).toFixed(percent?0:0)}${percent?'%':''}`} domain={stacked?[0,100]:['auto','auto']} axisLine={false} tickLine={false}/><Tooltip contentStyle={{background:'var(--terminal-panel)',border:'1px solid var(--terminal-border)',borderRadius:6,fontSize:12,color:'var(--terminal-text-primary)'}} formatter={(v:number,name:string)=>[`${Number(v).toFixed(2)}${percent?'%':''}`,name]}/><Legend wrapperStyle={{fontSize:11,paddingTop:12}}/></>;
+  return <div role="img" aria-label={label} className="h-[320px] w-full min-w-0" data-chart={label}><ResponsiveContainer width="100%" height="100%">{stacked?<AreaChart {...shared}>{axes}{keys.map((k,i)=><Area key={k} dataKey={k} type="stepAfter" stackId="allocation" stroke={COLORS[i%COLORS.length]} fill={COLORS[i%COLORS.length]} fillOpacity={0.7} connectNulls={false} isAnimationActive={false}/>)}</AreaChart>:<LineChart {...shared}>{axes}{keys.map((k,i)=><Line key={k} dataKey={k} type="linear" stroke={COLORS[i%COLORS.length]} strokeWidth={1.8} dot={false} connectNulls={false} isAnimationActive={false}/>)}</LineChart>}</ResponsiveContainer></div>;
+}
