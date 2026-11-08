@@ -82,3 +82,12 @@ table {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--terminal-text-secondary);
 }
+
+@layer components {
+  .control { @apply inline-flex items-center gap-2 rounded border border-terminal-border bg-terminal-panel px-3 py-2 text-xs text-terminal-primary transition-colors hover:border-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed; }
+  .data-note { @apply text-xs text-terminal-muted leading-relaxed; }
+  .research-copy { @apply text-sm text-terminal-muted leading-7; }
+  .notice { @apply rounded border border-amber-500/40 bg-amber-500/5 p-4 text-xs text-amber-700 dark:text-amber-300 leading-relaxed; }
+}
+:focus-visible { outline: 2px solid #10b981; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { *,*::before,*::after { animation-duration:0.01ms !important; transition-duration:0.01ms !important; } }
