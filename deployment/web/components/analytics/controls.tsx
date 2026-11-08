@@ -1,0 +1,6 @@
+'use client';
+import { RefreshCw } from 'lucide-react';
+import { VARIANTS } from '@/lib/contracts';
+export function Refresh({onClick,loading}:{onClick:()=>void;loading:boolean}){return <button type="button" onClick={onClick} disabled={loading} className="control"><RefreshCw size={13} className={loading?'animate-spin':''}/>{loading?'Loading':'Refresh'}</button>;}
+export function PeriodSelect({value,onChange}:{value:string;onChange:(value:string)=>void}){return <label className="flex items-center gap-2 text-xs text-terminal-muted">Evaluation window<select className="control" value={value} onChange={e=>onChange(e.target.value)}><option value="holdout">Research holdout</option><option value="train">Research training</option><option value="post">Post-research / catch-up</option><option value="full">Full simulation history</option></select></label>;}
+export function VariantSelect({value,onChange}:{value:string;onChange:(value:string)=>void}){return <div aria-label="Strategy variant" className="flex flex-wrap gap-1">{VARIANTS.map(v=><button type="button" key={v} aria-pressed={value===v} onClick={()=>onChange(v)} className={`control ${value===v?'border-emerald-400 text-emerald-500 bg-emerald-500/10':''}`}>{v}</button>)}</div>;}
