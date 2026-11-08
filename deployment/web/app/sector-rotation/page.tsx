@@ -8,6 +8,7 @@ import { SectionHeader } from "@/components/ui/section-header";
 import { DataTable, ColumnDef } from "@/components/ui/data-table";
 import { LoadingMetricSkeleton, LoadingTableSkeleton } from "@/components/ui/loading-state";
 import { EmptyState } from "@/components/ui/empty-state";
+import { SERIES_COLORS } from "@/lib/chart-series";
 import { RefreshCw, Compass } from "lucide-react";
 
 interface SectorRRG {
@@ -24,14 +25,7 @@ interface RRGResponse {
   sectors: Record<string, SectorRRG>;
 }
 
-const SECTOR_COLORS: Record<string, string> = {
-  AUTO: "#D97706",
-  BANK: "#2563EB",
-  FMCG: "#059669",
-  IT: "#0891B2",
-  METAL: "#64748B",
-  PHARMA: "#9333EA",
-};
+const SECTOR_COLORS = SERIES_COLORS;
 
 export default function SectorRotationPage() {
   const [data, setData] = useState<RRGResponse | null>(null);
@@ -268,6 +262,10 @@ export default function SectorRotationPage() {
               subtitle="5-Session Trailing Vector against NIFTY 50 (100, 100)"
               className="flex-1"
             >
+              <ul aria-label="Sector rotation legend" className="flex flex-wrap gap-x-4 gap-y-2 mb-3 text-xs text-terminal-muted">
+                {tableData.map(({sector}) => <li key={sector} className="flex items-center gap-2"><span className="h-2 w-2 rounded-full" style={{background:SECTOR_COLORS[sector]}} />NIFTY {sector}</li>)}
+              </ul>
+              <p className="data-note mb-3">Small points are dated historical observations; large points show the latest session. Hover a point for its date and values.</p>
               <div className="relative w-full aspect-square max-w-[500px] mx-auto bg-terminal-secondary/30 rounded-sm border border-terminal-border/80 overflow-hidden select-none">
                 <svg
                   viewBox="0 0 500 500"
@@ -398,7 +396,7 @@ export default function SectorRotationPage() {
                             r={1.5 + (idx / trailPoints.length) * 2}
                             fill={color}
                             opacity={0.3 + (idx / trailPoints.length) * 0.5}
-                          />
+                          ><title>{`${sector} | ${sData.trail[idx].date} | RS-Ratio ${sData.trail[idx].rs_ratio.toFixed(2)} | RS-Momentum ${sData.trail[idx].rs_momentum.toFixed(2)}`}</title></circle>
                         ))}
 
                         {/* Current Head Node */}
@@ -408,7 +406,7 @@ export default function SectorRotationPage() {
                           r={isHovered ? "7" : "5.5"}
                           fill={color}
                           className="stroke-terminal-panel stroke-2"
-                        />
+                        ><title>{`${sector} | ${data?.latest_date} | RS-Ratio ${sData.current_ratio.toFixed(2)} | RS-Momentum ${sData.current_momentum.toFixed(2)}`}</title></circle>
 
                         {/* Sector Abbreviation Label */}
                         <text
