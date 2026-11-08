@@ -3,7 +3,8 @@ import { queryNeon } from "@/lib/neon";
 
 export const dynamic = "force-dynamic";
 
-const SECTORS = ["AUTO", "BANK", "FMCG", "IT", "METAL", "PHARMA"];
+import { SECTORS } from "@/lib/contracts";
+import { integer, apiError } from "@/lib/http";
 
 function calculateMeanStd(values: number[]): { mean: number; std: number } {
   const n = values.length;
@@ -16,15 +17,18 @@ function calculateMeanStd(values: number[]): { mean: number; std: number } {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const trailLength = parseInt(searchParams.get("trail") || "5"); // default 5 trailing days
+    const trailLength = integer(searchParams.get("trail"),5,1,20); // default 5 trailing days
 
     // Load last 80 sessions of closing prices for NIFTY 50 and the 6 sectors
     const sql = `
-      SELECT symbol, date::text as date, close
-      FROM index_candles_daily
-      WHERE symbol IN ('NIFTY 50', 'NIFTY AUTO', 'NIFTY BANK', 'NIFTY FMCG', 'NIFTY IT', 'NIFTY METAL', 'NIFTY PHARMA')
-      ORDER BY date DESC
-      LIMIT 80 * 7;
+      WITH common_dates AS (
+        SELECT date FROM index_candles_daily
+        WHERE symbol IN ('NIFTY 50','NIFTY AUTO','NIFTY BANK','NIFTY FMCG','NIFTY IT','NIFTY METAL','NIFTY PHARMA') AND close > 0
+        GROUP BY date HAVING COUNT(DISTINCT symbol)=7 ORDER BY date DESC LIMIT 80
+      )
+      SELECT symbol,date::text AS date,close FROM index_candles_daily
+      WHERE date IN (SELECT date FROM common_dates)
+      AND symbol IN ('NIFTY 50','NIFTY AUTO','NIFTY BANK','NIFTY FMCG','NIFTY IT','NIFTY METAL','NIFTY PHARMA') ORDER BY date,symbol;
     `;
     const rows = await queryNeon(sql);
 
@@ -36,8 +40,8 @@ export async function GET(request: NextRequest) {
     }
 
     const sortedDates = Object.keys(pricesByDate).sort();
-    if (sortedDates.length < 52) {
-      return NextResponse.json({ error: "Insufficient historical data for RRG calculation (requires at least 52 sessions)." }, { status: 400 });
+    if (sortedDates.length < 59) {
+      return NextResponse.json({ error: "Insufficient historical data for RRG calculation (requires at least 59 aligned sessions)." }, { status: 400 });
     }
 
     // 1. Compute RS = Sector / NIFTY50
@@ -48,11 +52,11 @@ export async function GET(request: NextRequest) {
     for (const d of sortedDates) {
       const dayPrices = pricesByDate[d];
       const pNifty = dayPrices["NIFTY 50"];
-      if (!pNifty) continue;
+      if (!(pNifty > 0) || !SECTORS.every(s => dayPrices[`NIFTY ${s}`] > 0)) continue;
       validDates.push(d);
       for (const s of SECTORS) {
         const pSec = dayPrices[`NIFTY ${s}`];
-        rsSeries[s].push(pSec ? pSec / pNifty : 1.0);
+        rsSeries[s].push(pSec / pNifty);
       }
     }
 
@@ -113,24 +117,20 @@ export async function GET(request: NextRequest) {
       const current = slice[slice.length - 1];
       output[s] = {
         sector: s,
-        current_ratio: current?.rs_ratio ?? 100,
-        current_momentum: current?.rs_momentum ?? 100,
-        quadrant: current?.quadrant ?? "Leading",
+        current_ratio: current.rs_ratio,
+        current_momentum: current.rs_momentum,
+        quadrant: current.quadrant,
         trail: slice,
       };
     }
 
     return NextResponse.json({
       benchmark: "NIFTY 50",
+      method: "50-session standardized relative strength; 10-session standardized momentum. Descriptive visualization, independent of portfolio selection.",
+      aligned_sessions: validDates.length,
       latest_date: latestDate,
       trail_length: trailLength,
       sectors: output,
     });
-  } catch (error: any) {
-    return NextResponse.json(
-      { error: error.message || "Failed to calculate Relative Rotation Graph" },
-      { status: 500 }
-    );
-  }
+  } catch (error) { return apiError(error); }
 }
-
