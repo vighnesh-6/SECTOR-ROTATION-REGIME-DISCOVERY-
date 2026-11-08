@@ -78,7 +78,7 @@ jobs:
           if [[ "$mode" == test-live ]]; then
             python -m pip install pytest==8.3.4
             echo "### Event Automation: Test-Live Persistence Verification" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
-            echo "Target branch: \`br-odd-star-a1hjl6dl\` (endpoint: \`ep-cold-wind-a14dq44q\`)" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+            echo "Target branch: \`br-green-lab-a1ywzpjw\` (endpoint: \`ep-lively-voice-a13sw0d6\`)" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
             echo "- Confirmation flag received: \`${EVENT_TEST_BRANCH_CONFIRMED:-[EMPTY]}\`" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
             echo "- Test database URL configured: $(if [[ -n "${EVENT_TEST_DATABASE_URL:-}" ]]; then echo "YES"; else echo "NO"; fi)" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
             if python -B -m pytest -v -p no:cacheprovider deployment/tests/test_event_neon_persistence.py 2>&1 | tee test_live_output.log; then
