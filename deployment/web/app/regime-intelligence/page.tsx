@@ -1,267 +1,30 @@
-"use client";
-
-import React, { useEffect, useState } from "react";
-import { TerminalPanel } from "@/components/ui/terminal-panel";
-import { MetricTile } from "@/components/ui/metric-tile";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { SectionHeader } from "@/components/ui/section-header";
-import { DataTable, ColumnDef } from "@/components/ui/data-table";
-import { LoadingTableSkeleton, LoadingMetricSkeleton } from "@/components/ui/loading-state";
-import { RefreshCw, Activity, Cpu, Layers } from "lucide-react";
-
-interface RegimeProfile {
-  id: number;
-  name: string;
-  economicMeaning: string;
-  expectedDuration: string;
-  vixProfile: string;
-  authorizedSectors: string[];
-  templateACash: string;
-  templateBCash: string;
+'use client';
+import {useState} from 'react';
+import { TerminalPanel } from '@/components/ui/terminal-panel';
+import { MetricTile } from '@/components/ui/metric-tile';
+import { SectionHeader } from '@/components/ui/section-header';
+import { DataTable } from '@/components/ui/data-table';
+import { EmptyState } from '@/components/ui/empty-state';
+import { ResearchChart } from '@/components/analytics/chart';
+import { Refresh } from '@/components/analytics/controls';
+import { useApi } from '@/lib/use-api';
+import {pct,fmt,REGIME_NAMES} from '@/lib/contracts';
+import research from '@/lib/research-artifacts.json';
+export default function RegimeIntelligencePage(){
+ const [profilePeriod,setProfilePeriod]=useState('holdout'),[historyPeriod,setHistoryPeriod]=useState('holdout');
+ const dates:Record<string,string>={holdout:'from_date=2025-01-02&to_date=2026-09-18',full:'from_date=2019-10-31',post:'from_date=2026-09-21'};
+ const latest=useApi<any>('/api/v1/regime/latest'),history=useApi<any>('/api/v1/regime/history?'+dates[historyPeriod]);
+ const profiles=research.regime_profiles.filter(r=>r.period===profilePeriod);
+ return <div className="space-y-5">
+ <SectionHeader title="Regime intelligence" description="Six-state Gaussian HMM · stored causal inference · frozen research characterization" action={<Refresh loading={latest.loading||history.loading} onClick={()=>{latest.refresh();history.refresh();}}/>}/>
+ {latest.error?<EmptyState title="Latest regime unavailable" description={latest.error}/>:<div className="grid gap-4 md:grid-cols-4"><MetricTile label="Accepted regime" value={latest.data?`R${latest.data.accepted_regime.id}`:null} subtitle={latest.data?.accepted_regime.economic_name}/><MetricTile label="Maximum posterior" value={pct(latest.data?.accepted_regime.max_probability)} subtitle={latest.data?.date}/><MetricTile label="Acceptance threshold" value={pct(research.rules.confidence_threshold)} subtitle="Frozen confidence rule"/><MetricTile label="Minimum holding" value={research.rules.minimum_holding_sessions+' sessions'} subtitle="R3 crisis bypass; execution remains T+1"/></div>}
+ <TerminalPanel title="Historical causal probabilities" subtitle="Actual stored probabilities; gaps and invalid observations are not interpolated." headerRight={<label className="text-xs">History window <select className="control" value={historyPeriod} onChange={e=>setHistoryPeriod(e.target.value)}><option value="holdout">Research holdout</option><option value="full">All inference history</option><option value="post">Post-research</option></select></label>}>
+ {history.error?<EmptyState title="History unavailable" description={history.error}/>:history.loading?<p className="data-note">Loading probability history…</p>:<><ResearchChart data={(history.data?.history??[]).map((r:any)=>({...r,...Object.fromEntries(Array.from({length:6},(_,i)=>[`R${i}`,r[`R${i}`]===null?null:r[`R${i}`]*100]))}))} keys={REGIME_NAMES.map((_,i)=>'R'+i)} percent label="Historical causal HMM regime probabilities"/>{history.data?.invalid_rows>0&&<p role="alert" className="notice">{history.data.invalid_rows} invalid inference rows are shown as gaps.</p>}</>}
+ </TerminalPanel>
+ <TerminalPanel title="Frozen causal regime profiles" subtitle="Observed research statistics; these are not forecasts of duration or volatility." headerRight={<label className="text-xs">Research sample <select className="control" value={profilePeriod} onChange={e=>setProfilePeriod(e.target.value)}><option value="holdout">Holdout</option><option value="train">Training</option></select></label>}>
+ <DataTable keyField="regime_id" data={profiles} columns={[{key:'regime_id',header:'Regime',render:r=>'R'+r.regime_id},{key:'economic_name',header:'Characterization'},{key:'n_trading_days',header:'Observed sessions'},{key:'n_episodes',header:'Episodes'},{key:'mean_duration_days',header:'Mean duration',render:r=>r.n_trading_days?fmt(r.mean_duration_days,1):'—'},{key:'vix_close_mean',header:'Mean INDIA VIX',render:r=>r.n_trading_days?fmt(r.vix_close_mean):'—'},{key:'cash',header:'Template B cash floor',render:r=>pct(research.rules.template_b_cash[r.regime_id],0)}]}/>
+ <div className="grid gap-3 md:grid-cols-2 mt-4">{profiles.map(r=><div key={r.regime_id} className="rounded border border-terminal-border p-4"><h3 className="text-sm font-semibold">R{r.regime_id} ? {r.economic_name}</h3><p className="data-note mt-2">{r.description}</p><p className="text-xs text-amber-600 dark:text-amber-400 mt-3">{r.caveats}</p><p className="data-note mt-3">Authorized sectors: {research.rules.regime_sectors[r.regime_id].join(' / ')}</p></div>)}</div>
+ </TerminalPanel>
+ <p className="data-note">Source: results/regime_characterization/regime_profiles/model_regime_profiles.csv · HMM filtered_causal rows only. Raw causal state characterization differs from the confidence/holding-gated accepted regime.</p>
+ </div>;
 }
-
-const REGIME_PROFILES: RegimeProfile[] = [
-  {
-    id: 0,
-    name: "Cyclical Reflation Rally",
-    economicMeaning: "Early bull cycle acceleration, strong industrial and high-beta participation.",
-    expectedDuration: "14.2 sessions",
-    vixProfile: "Declining / Moderate (13–16)",
-    authorizedSectors: ["IT", "METAL"],
-    templateACash: "0.0%",
-    templateBCash: "0.0%",
-  },
-  {
-    id: 1,
-    name: "High-Volatility Bounce",
-    economicMeaning: "Post-drawdown relief rally with violent sector rotation and wide intra-day swings.",
-    expectedDuration: "8.6 sessions",
-    vixProfile: "Elevated / Mean-reverting (18–24)",
-    authorizedSectors: ["AUTO", "METAL"],
-    templateACash: "0.0%",
-    templateBCash: "20.0%",
-  },
-  {
-    id: 2,
-    name: "Low-Volatility Consolidation",
-    economicMeaning: "Sideways range-bound base building, defensive growth leadership.",
-    expectedDuration: "18.4 sessions",
-    vixProfile: "Low / Suppressed (11–13)",
-    authorizedSectors: ["IT", "PHARMA"],
-    templateACash: "0.0%",
-    templateBCash: "0.0%",
-  },
-  {
-    id: 3,
-    name: "Acute Liquidation / Crisis",
-    economicMeaning: "Severe systemic shock, panic selling across equities, rapid flight to liquidity.",
-    expectedDuration: "6.1 sessions",
-    vixProfile: "Spiking (> 25, high kurtosis)",
-    authorizedSectors: ["PHARMA", "FMCG"],
-    templateACash: "0.0%",
-    templateBCash: "50.0%",
-  },
-  {
-    id: 4,
-    name: "Steady Expansion",
-    economicMeaning: "Broad-based institutional rally with low realized dispersion.",
-    expectedDuration: "22.8 sessions",
-    vixProfile: "Steady Low (12–15)",
-    authorizedSectors: ["METAL", "AUTO"],
-    templateACash: "0.0%",
-    templateBCash: "0.0%",
-  },
-  {
-    id: 5,
-    name: "Correction / Risk-Off Digestion",
-    economicMeaning: "Market breadth deterioration, defensive rotation into staples and healthcare.",
-    expectedDuration: "11.5 sessions",
-    vixProfile: "Rising / Choppy (16–20)",
-    authorizedSectors: ["PHARMA", "FMCG"],
-    templateACash: "0.0%",
-    templateBCash: "30.0%",
-  },
-];
-
-export default function RegimeIntelligencePage() {
-  const [activeRegimeId, setActiveRegimeId] = useState<number>(0);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch("/api/v1/regime/latest")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data && data.accepted_regime) {
-          setActiveRegimeId(data.accepted_regime.id);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  const columns: ColumnDef<RegimeProfile>[] = [
-    {
-      key: "id",
-      header: "Regime",
-      width: "90px",
-      render: (row) => (
-        <div className="flex items-center gap-1.5">
-          <StatusBadge
-            label={`R${row.id}`}
-            variant="regime"
-            regimeId={row.id}
-            size="sm"
-          />
-          {row.id === activeRegimeId && (
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "name",
-      header: "Economic Characterization",
-      render: (row) => (
-        <div>
-          <span className="font-bold text-terminal-primary block">{row.name}</span>
-          <span className="text-[11px] text-terminal-muted">{row.economicMeaning}</span>
-        </div>
-      ),
-    },
-    {
-      key: "authorizedSectors",
-      header: "Authorized Sectors",
-      render: (row) => (
-        <div className="flex gap-1.5">
-          {row.authorizedSectors.map((s) => (
-            <span
-              key={s}
-              className="px-1.5 py-0.5 rounded-sm bg-terminal-secondary text-[11px] font-mono border border-terminal-border text-terminal-primary font-semibold"
-            >
-              {s}
-            </span>
-          ))}
-        </div>
-      ),
-    },
-    {
-      key: "vixProfile",
-      header: "INDIA VIX Regime",
-      render: (row) => (
-        <span className="font-mono text-xs text-terminal-primary">{row.vixProfile}</span>
-      ),
-    },
-    {
-      key: "expectedDuration",
-      header: "Mean Duration",
-      align: "right",
-      render: (row) => (
-        <span className="font-mono text-terminal-primary">{row.expectedDuration}</span>
-      ),
-    },
-    {
-      key: "templateBCash",
-      header: "Defensive Cash (Tpl B)",
-      align: "right",
-      render: (row) => (
-        <span className="font-mono font-semibold text-amber-600 dark:text-amber-400">
-          {row.templateBCash}
-        </span>
-      ),
-    },
-  ];
-
-  return (
-    <div className="space-y-5">
-      <SectionHeader
-        title="Gaussian Hidden Markov Model (HMM) Regime Intelligence"
-        description="6-State Latent Macro Dynamics &bull; Causal Online Filtering &bull; Hysteresis Guardrails &bull; Crisis Fast-Path"
-        badge={
-          <StatusBadge
-            label="UNSUPERVISED CAUSAL INFERENCE"
-            variant="neutral"
-          />
-        }
-      />
-
-      {/* KPI Tiles */}
-      {loading ? (
-        <LoadingMetricSkeleton count={4} />
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
-          <MetricTile
-            label="Gaussian States"
-            value="6 States"
-            delta="Akaike & Bayesian Criteria"
-            deltaType="neutral"
-            subtitle="Identified from In-Sample Phase"
-          />
-          <MetricTile
-            label="Acceptance Threshold"
-            value="P ≥ 0.50"
-            delta="Confidence Floor"
-            deltaType="positive"
-            subtitle="Prevents Churn on State Uncertainty"
-          />
-          <MetricTile
-            label="Holding Lockup"
-            value="5 Days"
-            delta="Turnover Reduction"
-            deltaType="neutral"
-            subtitle="Non-Crisis Persistence"
-          />
-          <MetricTile
-            label="Crisis Bypass (R3)"
-            value="0 Sessions"
-            delta="Instant Execution"
-            deltaType="positive"
-            subtitle="Overrules 5-Day Lockup"
-          />
-        </div>
-      )}
-
-      {/* Regime Characterization Table */}
-      <TerminalPanel
-        title="Institutional Regime Taxonomy & Authorized Allocations"
-        subtitle="Complete catalog of 6 economic states discovered from NSE market data"
-      >
-        <DataTable
-          columns={columns}
-          data={REGIME_PROFILES}
-          keyField="id"
-          zebra
-        />
-      </TerminalPanel>
-
-      {/* Mathematical & Causal Guarantees */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="p-4 rounded-sm border border-terminal-border bg-terminal-panel">
-          <h4 className="font-mono text-xs font-bold uppercase text-terminal-primary mb-2">
-            Forward Filtering Formulation (Zero Lookahead)
-          </h4>
-          <p className="text-xs text-terminal-muted leading-relaxed mb-3">
-            State inference is executed strictly online using only the causal forward filter.
-            Smoothing algorithms (which use future data) are mathematically excluded from the
-            production inference path:
-          </p>
-          <div className="p-2.5 rounded-sm bg-terminal-secondary font-mono text-xs text-terminal-primary border border-terminal-border overflow-x-auto">
-            P(S_t | Y_{`1:t`}) ∝ P(Y_t | S_t) &bull; ∑ [ P(S_t | S_{`t-1`}) &bull; P(S_{`t-1`} | Y_{`1:t-1`}) ]
-          </div>
-        </div>
-
-        <div className="p-4 rounded-sm border border-terminal-border bg-terminal-panel">
-          <h4 className="font-mono text-xs font-bold uppercase text-terminal-primary mb-2">
-            Hysteresis & Incumbent Persistence Rule
-          </h4>
-          <p className="text-xs text-terminal-muted leading-relaxed">
-            If the maximum posterior probability falls below the confidence threshold
-            (max P &lt; 0.50), the system rejects the candidate transition and preserves the
-            incumbent regime. This prevents spurious portfolio rebalancing during low-conviction
-            market noise.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
