@@ -3,7 +3,7 @@ import os
 from urllib.parse import urlparse
 
 PRODUCTION_ENDPOINT = 'ep-calm-rain-a1emw9d9'
-EXPECTED_TEST_ENDPOINT = 'ep-cold-wind-a14dq44q'
+EXPECTED_TEST_ENDPOINT = 'ep-lively-voice-a13sw0d6'
 
 
 def isolated_test_url():
