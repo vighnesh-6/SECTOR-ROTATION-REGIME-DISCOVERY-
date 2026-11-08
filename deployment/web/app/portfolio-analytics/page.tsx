@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useApi } from '@/lib/use-api';
 import { VARIANTS,SECTORS,pct,fmt,numeric } from '@/lib/contracts';
 import { performance,curve,simulationSeries } from '@/lib/analytics';
+import { PortfolioHistory } from '@/components/analytics/portfolio-history';
 import { ResearchChart } from '@/components/analytics/chart';
 import { PeriodSelect,VariantSelect,Refresh } from '@/components/analytics/controls';
 export default function PortfolioAnalyticsPage(){
@@ -24,9 +25,10 @@ export default function PortfolioAnalyticsPage(){
   {error?<EmptyState title="Portfolio data unavailable" description={error} action={<Refresh loading={loading} onClick={refresh}/>}/>:loading?<p className="data-note py-12">Loading actual simulation records…</p>:<>
    <p className="data-note">Selected observations: {selectedMetrics?.start??'—'} ? {selectedMetrics?.end??'—'} ? {selectedMetrics?.count??0} return intervals. Research holdout ends 2026-09-18; later catch-up is a separate window.</p>
    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><MetricTile label={selected+' · Window return'} value={pct(selectedMetrics?.total_return)}/><MetricTile label="Annualized growth" value={pct(selectedMetrics?.cagr)} subtitle="252-session compounding convention"/><MetricTile label="Maximum drawdown" value={pct(selectedMetrics?.max_drawdown)} subtitle="Within selected observations"/><MetricTile label="Latest stored NAV" value={fmt(holding?.net_nav,4)} subtitle={holding?`As of ${holding.date} · ${holding.period}`:'Unavailable'}/></div>
+   {data?.filters && <PortfolioHistory variant={selected} fromDate={data.filters.from_date} toDate={data.filters.to_date} />}
    <TerminalPanel title="Equity curves & benchmark comparison" subtitle="Rebased to 100 immediately before the selected window; first session return is included. Missing observations are not forward-filled."><ResearchChart data={curve(series)} keys={Object.keys(series)} label="Rebased strategy and benchmark equity curves"/></TerminalPanel>
    <TerminalPanel title="Performance in the selected window" subtitle="NAV-derived total return; sample volatility; arithmetic-return Sharpe with Rf=0%."><DataTable data={metrics} columns={columns} keyField="variant"/></TerminalPanel>
-   <TerminalPanel title={selected+' · Realized allocation history'} subtitle="End-of-session simulation weights; these include market drift and differ from next-session targets."><ResearchChart data={allocation} keys={assets} stacked percent label="Realized sector and cash allocation history"/></TerminalPanel>
+   <TerminalPanel title={selected+' · Realized allocation history'} subtitle="End-of-session simulation weights; these include market drift and differ from next-session targets."><ResearchChart data={allocation} keys={assets} stacked percent label="Realized sector and cash allocation history" yLabel="Realized weight (%)"/></TerminalPanel>
    <TerminalPanel title={selected+' · Latest stored holdings'} subtitle={holding?`Session ${holding.date}; independent of the chart window above.`:'No current holdings record'}>
     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">{assets.map(s=><MetricTile key={s} label={s} value={pct(holding?.['w_post_'+s.toLowerCase()],1)}/>)}</div>
    </TerminalPanel>
