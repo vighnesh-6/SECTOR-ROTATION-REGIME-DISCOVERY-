@@ -98,6 +98,7 @@ export function TopNavigation() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  aria-current={active ? "page" : undefined}
                   className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs font-mono font-medium rounded-t-sm transition-colors whitespace-nowrap border-b-2 ${
                     active
                       ? "border-emerald-500 text-terminal-primary bg-terminal-secondary/60 font-semibold"
@@ -120,6 +121,7 @@ export function TopNavigation() {
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="p-1.5 rounded border border-terminal-border bg-terminal-secondary text-terminal-primary hover:bg-terminal-panel focus:outline-none"
               aria-label="Toggle navigation menu"
+              aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
