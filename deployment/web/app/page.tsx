@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { useApi } from '@/lib/use-api';
 import { pct,fmt,UNIVERSE } from '@/lib/contracts';
 import { Refresh } from '@/components/analytics/controls';
+import { SERIES_COLORS } from '@/lib/chart-series';
 export default function OverviewPage(){
   const health=useApi<any>('/api/v1/health',true),regime=useApi<any>('/api/v1/regime/latest'),port=useApi<any>('/api/v1/portfolios');
   const h=health.data,r=regime.data;
@@ -23,7 +24,7 @@ export default function OverviewPage(){
     {(health.error||h?.status!=='HEALTHY')&&!health.loading&&<div role="status" className="notice">{health.error||(h?.reasons||[]).join(' · ')}<p className="mt-2">{h?.freshness_policy}</p></div>}
     <div className="grid gap-4 lg:grid-cols-3">
       <TerminalPanel title="Causal regime probabilities" subtitle={r?`Inference session ${r.date} · ${r.period}`:'Waiting for valid inference'} className="lg:col-span-2">
-        {regime.error?<EmptyState title="Regime data unavailable" description={regime.error}/>:regime.loading?<p className="data-note">Loading inference…</p>:<div className="space-y-4">{r?.probabilities.map((p:any)=><div key={p.id}><div className="flex justify-between gap-3 text-xs mb-2"><span>R{p.id} ? {p.name}</span><span className="font-mono">{pct(p.prob)}</span></div><div className="h-2 bg-terminal-secondary rounded"><div className="h-2 bg-emerald-400 rounded" style={{width:`${p.prob*100}%`}}/></div></div>)}</div>}
+        {regime.error?<EmptyState title="Regime data unavailable" description={regime.error}/>:regime.loading?<p className="data-note">Loading inference…</p>:<div className="space-y-4">{r?.probabilities.map((p:any)=><div key={p.id}><div className="flex justify-between gap-3 text-xs mb-2"><span>R{p.id} ? {p.name}</span><span className="font-mono">{pct(p.prob)}</span></div><div className="h-2 bg-terminal-secondary rounded"><div className="h-2 bg-emerald-400 rounded" style={{width:`${p.prob*100}%`,backgroundColor:SERIES_COLORS[`R${p.id}`]}} title={`${r.date} | R${p.id} ${p.name} | ${pct(p.prob)}`} role="progressbar" aria-label={`R${p.id} ${p.name} posterior`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.prob*100}/></div></div>)}</div>}
       </TerminalPanel>
       <TerminalPanel title="Canonical market universe" subtitle="Eight index series; no stock-level universe">
         <div className="space-y-3">{UNIVERSE.map(symbol=>{const row=h?.indices?.find((i:any)=>i.symbol===symbol);return <div key={symbol} className="flex justify-between gap-2 text-xs"><span>{symbol}</span><span className={row?.stale?'text-amber-500':'text-terminal-muted'}>{row?.latest_date??'—'}</span></div>;})}</div>
