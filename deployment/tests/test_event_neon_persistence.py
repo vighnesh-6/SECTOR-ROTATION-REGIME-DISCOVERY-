@@ -7,10 +7,11 @@ from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import uuid
+import pytest
 
-from deployment.events.database import EventDatabase
+from deployment.events.database import EventDatabase, EventDatabaseError, verify_event_target
 from deployment.events.models import MacroEvent
-from deployment.events.storage import EventStorage
+from deployment.events.storage import EventStorage, INSERT_EVENT
 from deployment.events.testing import isolated_test_url
 
 
@@ -19,8 +20,9 @@ def test_isolated_neon_persistence_and_concurrent_idempotency():
     # rather than silently skipping a manually requested persistence verification.
     connection = isolated_test_url()
     db = EventDatabase(connection_string=connection)
+    identity = verify_event_target(db, 'eod_ops_test')
+    print('Verified disposable database identity:', json.dumps(identity))
     before = db.query('SELECT * FROM macro_events ORDER BY event_id')
-    assert len(before) >= 230, 'Test branch macro_events must contain at least 230 baseline records'
     snapshot = {int(r['event_id']): json.dumps(r, sort_keys=True, default=str) for r in before}
     logs_before = db.query('SELECT count(*) as count FROM pipeline_execution_logs')
     baseline_log_count = int(logs_before[0]['count'])
@@ -33,8 +35,16 @@ def test_isolated_neon_persistence_and_concurrent_idempotency():
     created_event_ids = []
     created_log_ids = []
     try:
+        row = event.to_db_row()
+        with pytest.raises(EventDatabaseError):
+            db.transaction([{'query':INSERT_EVENT,'params':[row[k] for k in
+                ['date','category','title','actual','forecast','previous','source']]},
+                {'query':'SELECT 1/0','params':[]}])
+        assert not db.query('SELECT event_id FROM macro_events WHERE source=$1',[event.source_id])
         def persist():
-            return EventStorage(EventDatabase(connection_string=connection)).persist_events([event], dry_run=False)
+            writer = EventDatabase(connection_string=connection)
+            verify_event_target(writer, 'eod_ops_test')
+            return EventStorage(writer).persist_events([event], dry_run=False)
 
         dry = EventStorage(db).persist_events([event], dry_run=True)
         assert dry['unique_to_insert'] == 1

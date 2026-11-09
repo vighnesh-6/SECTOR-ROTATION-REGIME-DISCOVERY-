@@ -13,7 +13,7 @@ import yaml
 
 from deployment.events.clock import IST
 from deployment.events.daily_collector import DailyEventCollector, check_health, main
-from deployment.events.database import EventDatabase, EventDatabaseError
+from deployment.events.database import EventDatabase, EventDatabaseError, verify_event_target
 from deployment.events.deduplication import EventDeduplicator
 from deployment.events.models import MacroEvent
 from deployment.events.normalization import normalize_datetime_to_date
@@ -317,7 +317,7 @@ def test_isolation_guard_rejects_incorrect_confirmation_values(bad_value, monkey
 
 @pytest.mark.parametrize('valid_value', ['true', '"true"', "'true'", 'true ', ' true', '  "true"  ', 'true\n'])
 def test_isolation_guard_accepts_propagated_confirmation(valid_value, monkeypatch):
-    monkeypatch.setenv('EVENT_TEST_DATABASE_URL','postgresql://u:p@ep-lively-voice-a13sw0d6.ap-southeast-1.aws.neon.tech/neondb')
+    monkeypatch.setenv('EVENT_TEST_DATABASE_URL','postgresql://u:p@ep-lively-voice-a13sw0d6.ap-southeast-1.aws.neon.tech/eod_ops_test')
     monkeypatch.setenv('EVENT_TEST_BRANCH_CONFIRMED', valid_value)
     assert 'ep-lively-voice-a13sw0d6' in isolated_test_url()
 
@@ -331,9 +331,49 @@ def test_isolation_guard_requires_exact_test_endpoint(monkeypatch):
 
 
 def test_isolation_guard_accepts_valid_test_endpoint(monkeypatch):
-    monkeypatch.setenv('EVENT_TEST_DATABASE_URL','postgresql://u:p@ep-lively-voice-a13sw0d6.ap-southeast-1.aws.neon.tech/neondb')
+    monkeypatch.setenv('EVENT_TEST_DATABASE_URL','postgresql://u:p@ep-lively-voice-a13sw0d6.ap-southeast-1.aws.neon.tech/eod_ops_test')
     monkeypatch.setenv('EVENT_TEST_BRANCH_CONFIRMED','true')
     assert 'ep-lively-voice-a13sw0d6' in isolated_test_url()
+
+
+@pytest.mark.parametrize('url',[
+    'postgresql://u:p@ep-calm-rain-a1emw9d9.ap-southeast-1.aws.neon.tech/neondb',
+    'postgresql://u:p@ep-lively-voice-a13sw0d6.evil.example/neondb',
+    'postgresql://u:p@ep-lively-voice-a13sw0d6.ap-southeast-1.aws.neon.tech/neondb?options=endpoint%3Devil',
+    'postgresql://u:p@ep-lively-voice-a13sw0d6.ap-southeast-1.aws.neon.tech/eod_ops_test',
+])
+def test_live_identity_guard_rejects_routing_before_sql(url):
+    db=MagicMock(connection_string=url)
+    with pytest.raises(EventDatabaseError): verify_event_target(db)
+    db.query.assert_not_called()
+
+
+def test_live_identity_guard_requires_actual_server_identity():
+    db=MagicMock(connection_string='postgresql://u:p@ep-lively-voice-a13sw0d6.ap-southeast-1.aws.neon.tech/neondb')
+    db.query.return_value=[{'database':'neondb','branch_id':'br-green-lab-a1ywzpjw','endpoint_id':'ep-lively-voice-a13sw0d6'}]
+    assert verify_event_target(db)['database']=='neondb'
+    db.query.return_value[0]['branch_id']='wrong'
+    with pytest.raises(EventDatabaseError): verify_event_target(db)
+
+
+@pytest.mark.parametrize('dry_run',[True,False])
+def test_default_collector_blocks_wrong_target_before_any_run_log(dry_run):
+    storage=MagicMock()
+    storage.db.connection_string='postgresql://u:p@ep-calm-rain-a1emw9d9.ap-southeast-1.aws.neon.tech/neondb'
+    with patch('deployment.events.daily_collector.EventStorage',return_value=storage):
+        with pytest.raises(EventDatabaseError): DailyEventCollector(dry_run=dry_run)
+    storage.db.query.assert_not_called()
+    storage.start_run.assert_not_called()
+
+
+def test_test_database_shares_endpoint_but_never_website_database(monkeypatch):
+    host='ep-lively-voice-a13sw0d6.ap-southeast-1.aws.neon.tech'
+    monkeypatch.setenv('DATABASE_URL','postgresql://u:p@'+host+'/neondb')
+    monkeypatch.setenv('EVENT_TEST_BRANCH_CONFIRMED','true')
+    monkeypatch.setenv('EVENT_TEST_DATABASE_URL','postgresql://u:p@'+host+'/eod_ops_test')
+    assert isolated_test_url().endswith('/eod_ops_test')
+    monkeypatch.setenv('EVENT_TEST_DATABASE_URL','postgresql://u:p@'+host+'/neondb')
+    with pytest.raises(ValueError): isolated_test_url()
 
 
 @pytest.mark.parametrize('status,exit_code',[('SUCCESS',0),('PARTIAL',1),('FAILED',1)])

@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 from deployment.events.clock import now_ist, IST
 from deployment.events.storage import EventStorage
+from deployment.events.database import verify_event_target
 from deployment.events.sources import RBISource, FedUsSource, MospiMofSource, SebiNseSource
 from deployment.events.sources.base import SourceError, FeedValidationError
 from deployment.events.diagnostics import exception_details, sanitize
@@ -27,6 +28,7 @@ class DailyEventCollector:
     def __init__(self, dry_run=True, storage=None, sources=None, clock=now_ist):
         self.dry_run = dry_run
         self.storage = storage if storage is not None else EventStorage()
+        self.database_identity = verify_event_target(self.storage.db) if storage is None else None
         self.sources = sources if sources is not None else [RBISource(), MospiMofSource(), FedUsSource(), SebiNseSource()]
         self.clock = clock
 
@@ -43,6 +45,7 @@ class DailyEventCollector:
         requested_window = {'start':requested_start.isoformat(), 'end':end.isoformat()}
         run_id = str(uuid.uuid4())
         summary = {'run_id':run_id, 'status':'FAILED', 'dry_run':self.dry_run,
+                   'database_identity':self.database_identity,
                    'started_at':now.isoformat(), 'new_events_inserted':0,
                    'requested_lookback_days':days_back, 'manual_start_date':start_date,
                    'requested_window':requested_window,
@@ -193,7 +196,9 @@ class DailyEventCollector:
 
 def check_health(storage=None, clock=now_ist):
     """Read-only source-success freshness, accounting for weekday schedules."""
-    storage = storage if storage is not None else EventStorage()
+    if storage is None:
+        storage = EventStorage()
+        verify_event_target(storage.db)
     now = _as_ist(clock())
     expected = now.date()
     if now.hour < 23:  # two-hour allowance for the 21:00 schedule
