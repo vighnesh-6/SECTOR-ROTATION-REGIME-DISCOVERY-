@@ -149,6 +149,41 @@ class NeonClient:
         for stmt in statements:
             self.execute(stmt + ";", timeout=timeout)
 
+    def execute_transaction(self, queries: List[Dict[str, Any]], timeout: int = 60) -> List[Dict[str, Any]]:
+        """One atomic HTTP batch; retry only errors known to have rolled back.
+
+        In particular, never retry an ambiguous network outcome as if it were a
+        rollback. Callers must re-inspect durable session state on the next run.
+        Existing query/execute contracts and EventDatabase remain unchanged.
+        """
+        if not queries or any(not isinstance(q.get("query"), str) for q in queries):
+            raise ValueError("A non-empty SQL transaction is required")
+        payload = json.dumps({"queries": queries}, allow_nan=False).encode("utf-8")
+        for attempt in range(4):
+            request = urllib.request.Request(self.endpoint, data=payload, headers={
+                "Content-Type": "application/json",
+                "Neon-Connection-String": self.connection_string,
+                "Neon-Batch-Isolation-Level": "Serializable",
+            })
+            try:
+                with urllib.request.urlopen(request, timeout=timeout) as response:
+                    result = json.loads(response.read())
+                rows = result.get("results")
+                if not isinstance(rows, list) or len(rows) != len(queries):
+                    raise RuntimeError("EOD transaction result is unconfirmed; inspect session state")
+                return rows
+            except urllib.error.HTTPError as error:
+                try:
+                    sqlstate = json.loads(error.read()).get("code")
+                except (ValueError, TypeError):
+                    sqlstate = None
+                if sqlstate in ("40001", "40P01") and attempt < 3:
+                    time.sleep(0.25 * 2 ** attempt)
+                    continue
+                raise RuntimeError("EOD transaction rejected; no upstream details exposed") from None
+            except (urllib.error.URLError, TimeoutError, OSError):
+                raise RuntimeError("EOD transaction outcome unconfirmed; inspect session state before retry") from None
+
     def ping(self) -> Dict[str, Any]:
         """Verify database connectivity."""
         rows = self.query("SELECT 1 as status, current_database() as db, version() as pg_version, current_timestamp as server_time;")

@@ -16,9 +16,10 @@ from decimal import Decimal
 
 
 class CandleReconciler:
-    def __init__(self, client: Any, tolerance: float = 1e-4) -> None:
+    def __init__(self, client: Any, tolerance: float = 1e-4, allow_revision_updates: bool = True) -> None:
         self.client = client
         self.tolerance = tolerance
+        self.allow_revision_updates = allow_revision_updates
 
     def ingest_candle(
         self,
@@ -44,6 +45,8 @@ class CandleReconciler:
             FROM index_candles_daily
             WHERE symbol = $1 AND date = $2;
         """
+        if not self.allow_revision_updates:
+            query = query.replace("close, volume", "close, adj_close, volume")
         rows = self.client.query(query, params=[symbol, date_str])
 
         if not rows:
@@ -52,7 +55,9 @@ class CandleReconciler:
                 INSERT INTO index_candles_daily (symbol, date, open, high, low, close, adj_close, volume, data_source)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9);
             """
-            self.client.execute(
+            if not self.allow_revision_updates:
+                insert_sql = insert_sql.rstrip().rstrip(";") + " ON CONFLICT (symbol, date) DO NOTHING;"
+            inserted = self.client.execute(
                 insert_sql,
                 params=[
                     symbol,
@@ -66,7 +71,12 @@ class CandleReconciler:
                     source,
                 ],
             )
-            return {"status": "INSERTED", "symbol": symbol, "date": date_str}
+            if self.allow_revision_updates or inserted:
+                return {"status": "INSERTED", "symbol": symbol, "date": date_str}
+            # A competing writer won the insert. Verify it; never overwrite it.
+            rows = self.client.query(query, params=[symbol, date_str])
+            if not rows:
+                raise RuntimeError("EOD candle insertion is unconfirmed; inspect stored state")
 
         # Existing record found -> inspect differences
         existing = rows[0]
@@ -77,6 +87,8 @@ class CandleReconciler:
             ("close", float(existing["close"]), float(close_val)),
             ("volume", float(existing["volume"]) if existing.get("volume") is not None else 0.0, float(volume_val)),
         ]
+        if not self.allow_revision_updates:
+            fields.append(("adj_close", float(existing["adj_close"]), float(adj_close_val)))
 
         has_revision = False
         revisions = []
@@ -90,6 +102,9 @@ class CandleReconciler:
 
         if not has_revision:
             return {"status": "DUPLICATE_IDENTICAL", "symbol": symbol, "date": date_str}
+
+        if not self.allow_revision_updates:
+            raise ValueError(f"RECOVERY_REQUIRED: existing candle conflicts for {symbol} on {date_str}; preserved")
 
         # Log revisions to reconciliation_audit_logs
         for field_name, old_v, new_v, abs_delta, pct_delta in revisions:

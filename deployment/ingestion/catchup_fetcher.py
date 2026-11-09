@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import sys
 import time
@@ -49,17 +50,21 @@ class CatchupIngestionService:
         yf_client: Optional[YahooFinanceClient] = None,
         max_retries_per_index: int = 4,
         retry_delay_seconds: float = 2.0,
+        append_only: bool = False,
+        persist_recovery_queue: bool = True,
     ) -> None:
         self.db = db_client or get_db_client()
         self.yf_client = yf_client or YahooFinanceClient()
-        self.reconciler = CandleReconciler(self.db)
+        self.reconciler = CandleReconciler(self.db, allow_revision_updates=not append_only)
+        self.persist_recovery_queue = persist_recovery_queue
         self.max_retries = max_retries_per_index
         self.retry_delay = retry_delay_seconds
-        STATE_DIR.mkdir(parents=True, exist_ok=True)
+        if self.persist_recovery_queue:
+            STATE_DIR.mkdir(parents=True, exist_ok=True)
 
     def load_recovery_queue(self) -> List[Dict[str, Any]]:
         """Load unresolved missing (date, symbol) items from persistent state."""
-        if not RECOVERY_QUEUE_PATH.exists():
+        if not self.persist_recovery_queue or not RECOVERY_QUEUE_PATH.exists():
             return []
         try:
             with open(RECOVERY_QUEUE_PATH, "r", encoding="utf-8") as f:
@@ -70,6 +75,8 @@ class CatchupIngestionService:
 
     def save_recovery_queue(self, queue: List[Dict[str, Any]]) -> None:
         """Persist unresolved missing items to state."""
+        if not self.persist_recovery_queue:
+            return
         try:
             with open(RECOVERY_QUEUE_PATH, "w", encoding="utf-8") as f:
                 json.dump(queue, f, indent=2)
@@ -162,11 +169,14 @@ class CatchupIngestionService:
         self,
         target_date: Optional[str] = None,
         trigger_type: str = "daily_cron",
+        expected_dates: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Execute historical catch-up ingestion from latest completed date + 1 to target_date.
         """
         start_time = time.time()
+        if expected_dates is not None:
+            return self.collect_expected_sessions(expected_dates)
         
         # 1. First recover any pending missing items
         recovery_summary = self.process_recovery_queue()
@@ -196,7 +206,7 @@ class CatchupIngestionService:
         logger.info(f"Executing historical catch-up: {from_date_str} -> {to_date_str}...")
 
         # Log pipeline start
-        log_res = self.db.execute(
+        log_rows = self.db.query(
             """
             INSERT INTO pipeline_execution_logs (session_date, trigger_type, status, step_reached, records_processed)
             VALUES ($1, $2, 'RUNNING', 'FETCH_STARTED', 0)
@@ -204,7 +214,9 @@ class CatchupIngestionService:
             """,
             params=[to_date_str, trigger_type],
         )
-        log_id = log_res if isinstance(log_res, int) else None
+        if len(log_rows) != 1 or not isinstance(log_rows[0].get("log_id"), int):
+            raise RuntimeError("Could not obtain the inserted ingestion log ID")
+        log_id = log_rows[0]["log_id"]
 
         total_inserted = 0
         total_duplicates = 0
@@ -286,3 +298,59 @@ class CatchupIngestionService:
                     params=[log_id, str(e), duration_ms],
                 )
             raise
+
+    def collect_expected_sessions(self, expected_dates: List[str]) -> Dict[str, Any]:
+        """EOD orchestrator path: recover explicit calendar sessions, not MAX(date).
+
+        No local queue is needed: every retry reconstructs all expected dates
+        after the last fully published session from the database and calendar.
+        This method never declares the downstream portfolio pipeline successful.
+        """
+        if not expected_dates:
+            return {"status": "UP_TO_DATE", "inserted": 0, "missing": []}
+        days = sorted(set(expected_dates))
+        if any(datetime.strptime(d, "%Y-%m-%d").strftime("%Y-%m-%d") != d for d in days):
+            raise ValueError("Invalid expected session dates")
+        if (date.fromisoformat(days[-1]) - date.fromisoformat(days[0])).days > 90:
+            raise ValueError("RECOVERY_REQUIRED: EOD recovery exceeds the 90-day bound")
+        missing = []
+        totals = {"inserted": 0, "duplicate": 0, "reconciled": 0}
+        expected = set(days)
+        for symbol in INDEX_TICKER_MAP:
+            complete = False
+            for attempt in range(self.max_retries):
+                try:
+                    candles = self.yf_client.fetch_historical_candles(symbol, days[0], days[-1])
+                    found = {}
+                    for candle in candles:
+                        d = candle.get("date")
+                        if d not in expected:
+                            continue
+                        if candle.get("symbol") != symbol or d in found:
+                            raise ValueError("Invalid or duplicate source candle")
+                        if not all(math.isfinite(float(candle[k])) and float(candle[k]) > 0
+                                   for k in ("open", "high", "low", "close", "adj_close")):
+                            raise ValueError("Invalid source candle prices")
+                        if float(candle["high"]) < max(float(candle["open"]), float(candle["close"])) or float(candle["low"]) > min(float(candle["open"]), float(candle["close"])):
+                            raise ValueError("Invalid source candle range")
+                        found[d] = candle
+                    # Identical existing candles are no-ops. Revisions fail closed.
+                    summary = self.reconciler.ingest_batch([found[d] for d in sorted(found)])
+                    for key in totals:
+                        totals[key] += summary[key]
+                    missing_days = sorted(expected - set(found))
+                    if not missing_days:
+                        complete = True
+                        break
+                except ValueError as error:
+                    if str(error).startswith("RECOVERY_REQUIRED:"):
+                        raise
+                    logger.warning("Source validation failed for %s (%s)", symbol, type(error).__name__)
+                except Exception as error:
+                    logger.warning("EOD source attempt failed for %s (%s)", symbol, type(error).__name__)
+                if attempt + 1 < self.max_retries:
+                    time.sleep(self.retry_delay * (attempt + 1))
+            if not complete:
+                missing.append(symbol)
+        return {"status": "PARTIAL_SUCCESS" if missing else "FETCH_COMPLETE",
+                **totals, "missing": missing, "expected_sessions": days}

@@ -22,10 +22,12 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 import time
 from datetime import datetime, date, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit, parse_qs
 from typing import Any, Dict, List, Optional
 
 DEPLOYMENT_ROOT = Path(__file__).resolve().parent.parent
@@ -47,6 +49,7 @@ from engine.portfolio_state import (
 )
 from ingestion.catchup_fetcher import CatchupIngestionService
 from ingestion.yfinance_client import YahooFinanceClient
+from ingestion.trading_calendar import TradingCalendar, IST
 
 logger = logging.getLogger("daily_eod")
 if not logger.handlers:
@@ -59,49 +62,153 @@ if not logger.handlers:
 VARIANTS = ["1A", "1B", "2A", "2B"]
 
 
-def run_pipeline(target_date: Optional[str] = None, trigger_type: str = "daily_cron") -> Dict[str, Any]:
-    start_time = time.time()
-    db = get_db_client()
+EXPECTED_BRANCH = "br-green-lab-a1ywzpjw"
+EXPECTED_ENDPOINT = "ep-lively-voice-a13sw0d6"
+FROZEN_RESEARCH_END = "2026-09-18"
+BENCHMARKS = {"NIFTY50_BUY_HOLD", "EQUAL_WEIGHT_6SECTOR"}
 
-    logger.info("=" * 65)
-    logger.info("STARTING DAILY EOD SECTOR ROTATION PIPELINE EXECUTION")
-    logger.info("=" * 65)
 
-    # 1. Ingestion: Fetch missing candles from Yahoo Finance and persist to Neon
-    logger.info("Step 1: Ingesting daily EOD candles from Yahoo Finance...")
-    ingestion_service = CatchupIngestionService(db_client=db)
-    fetch_res = ingestion_service.run_catchup(target_date=target_date, trigger_type=trigger_type)
-    logger.info(f"Ingestion result: {fetch_res}")
+class EODSafetyError(RuntimeError):
+    pass
 
-    if fetch_res.get("status") == "FAILED":
-        logger.error("Ingestion failed. Aborting downstream inference and portfolio updates.")
-        return {"status": "FAILED", "reason": "Ingestion failed", "fetch_res": fetch_res}
 
-    # 2. Check pending completed trading sessions
-    latest_inf_row = db.query("SELECT MAX(date)::text as max_date FROM regime_inference_daily;")
-    latest_infer_str = str(latest_inf_row[0]["max_date"])[:10] if latest_inf_row and latest_inf_row[0].get("max_date") else "2026-09-18"
+def _safe_error(error, connection=""):
+    text = str(error)
+    if connection:
+        text = text.replace(connection, "[REDACTED]")
+    text = re.sub(r"postgres(?:ql)?://[^\s]+", "[REDACTED]", text, flags=re.I)
+    text = re.sub(r"npg_[A-Za-z0-9_-]+", "[REDACTED]", text)
+    text = re.sub(r"(?i)(password|authorization|access_token)\s*[:=]\s*[^\s,;]+", r"\1=[REDACTED]", text)
+    return text[:400]
 
-    # Find complete sessions where all 8 indices are present in index_candles_daily
-    pending_dates_query = """
-        SELECT date::text as dt
-        FROM index_candles_daily
-        WHERE date > $1
-        GROUP BY date
-        HAVING COUNT(DISTINCT symbol) = 8
-        ORDER BY date ASC;
-    """
-    new_dates = [r["dt"][:10] for r in db.query(pending_dates_query, params=[latest_infer_str])]
 
-    if not new_dates:
-        logger.info(f"Pipeline is up-to-date. Latest completed session in DB is {latest_infer_str}.")
-        return {
-            "status": "UP_TO_DATE",
-            "latest_session": latest_infer_str,
-            "duration_ms": int((time.time() - start_time) * 1000),
-        }
+def verify_eod_target(db, expected_database="neondb"):
+    # Inspect routing BEFORE any query, including an identity SELECT.
+    try:
+        parsed = urlsplit(db.connection_string)
+        if (parsed.scheme not in ("postgres", "postgresql") or
+            parsed.hostname not in (EXPECTED_ENDPOINT + ".ap-southeast-1.aws.neon.tech",
+                                    EXPECTED_ENDPOINT + "-pooler.ap-southeast-1.aws.neon.tech") or
+            parsed.port not in (None, 5432) or not parsed.username or not parsed.password or
+            parsed.path != "/" + expected_database or parsed.fragment or
+            set(parse_qs(parsed.query)) - {"sslmode", "channel_binding"}):
+            raise ValueError()
+    except Exception:
+        raise EODSafetyError("EOD target is not the approved isolated endpoint/database; no SQL issued") from None
+    if expected_database not in ("neondb", "eod_ops_test"):
+        raise EODSafetyError("Unapproved EOD database")
+    rows = db.query("SELECT current_database() AS database, current_setting('neon.branch_id',true) AS branch_id, current_setting('neon.endpoint_id',true) AS endpoint_id")
+    expected = {"database": expected_database, "branch_id": EXPECTED_BRANCH, "endpoint_id": EXPECTED_ENDPOINT}
+    if len(rows) != 1 or any(rows[0].get(k) != v for k, v in expected.items()):
+        raise EODSafetyError("Server-reported EOD isolation mismatch")
+    return expected
 
-    logger.info(f"Step 2: Processing {len(new_dates)} new completed session(s): {new_dates}")
 
+def session_summary(db):
+    # Do not advance solely from inference MAX(date). Include every derived table.
+    return db.query("""
+        WITH dates AS (
+          SELECT date FROM regime_inference_daily UNION SELECT date FROM market_features_daily
+          UNION SELECT date FROM portfolio_simulations_daily UNION SELECT date FROM portfolio_allocations_daily
+          UNION SELECT date FROM benchmark_simulations_daily
+        )
+        SELECT d.date::text AS date,
+          (SELECT array_agg(symbol ORDER BY symbol) FROM index_candles_daily WHERE date=d.date) AS symbols,
+          (SELECT count(*)::int FROM market_features_daily WHERE date=d.date) AS features,
+          (SELECT count(*)::int FROM regime_inference_daily WHERE date=d.date) AS regimes,
+          (SELECT array_agg(variant ORDER BY variant) FROM portfolio_simulations_daily WHERE date=d.date) AS simulations,
+          (SELECT array_agg(variant ORDER BY variant) FROM portfolio_allocations_daily WHERE date=d.date) AS allocations,
+          (SELECT array_agg(benchmark_name ORDER BY benchmark_name) FROM benchmark_simulations_daily WHERE date=d.date) AS benchmarks
+        FROM dates d WHERE d.date >= $1::date ORDER BY d.date
+    """, [FROZEN_RESEARCH_END])
+
+
+def last_complete_session(db, calendar):
+    rows = session_summary(db)
+    previous = None
+    for row in rows:
+        day = date.fromisoformat(row["date"][:10])
+        if (set(row.get("symbols") or []) != set(REQUIRED_INDEX_SYMBOLS) or
+            int(row.get("regimes", 0)) != 1 or
+            (day.isoformat() > FROZEN_RESEARCH_END and int(row.get("features", 0)) != 1) or
+            sorted(row.get("simulations") or []) != sorted(VARIANTS) or
+            sorted(row.get("allocations") or []) != sorted(VARIANTS) or
+            sorted(row.get("benchmarks") or []) != sorted(BENCHMARKS)):
+            raise EODSafetyError("RECOVERY_REQUIRED: incomplete existing derived session " + day.isoformat() + "; records preserved")
+        if not calendar.is_session(day):
+            raise EODSafetyError("RECOVERY_REQUIRED: stored date is outside reviewed trading sessions")
+        if previous is None:
+            if day.isoformat() != FROZEN_RESEARCH_END:
+                raise EODSafetyError("RECOVERY_REQUIRED: frozen continuity anchor is absent")
+        elif calendar.next_session(previous) != day:
+            raise EODSafetyError("RECOVERY_REQUIRED: historical session gap; no checkpoint skipping")
+        previous = day
+    if previous is None:
+        raise EODSafetyError("RECOVERY_REQUIRED: no complete baseline session")
+    return previous
+
+
+def start_eod_run(db, session, trigger, identity):
+    rows = db.query("""INSERT INTO pipeline_execution_logs
+        (session_date,trigger_type,status,step_reached,records_processed,details)
+        VALUES ($1::date,$2,'RUNNING','EOD_STARTED',0,$3::jsonb) RETURNING log_id""",
+        [session, trigger, json.dumps({"component": "eod_pipeline", "identity": identity})])
+    if len(rows) != 1 or type(rows[0].get("log_id")) is not int:
+        raise EODSafetyError("Inserted EOD execution-log ID is unavailable")
+    return rows[0]["log_id"]
+
+
+def finish_eod_run(db, log_id, result, started):
+    success = result["status"] in ("SUCCESS", "UP_TO_DATE")
+    count = db.execute("""UPDATE pipeline_execution_logs
+        SET status=$2,step_reached=$3,records_processed=$4,duration_ms=$5,details=$6::jsonb,error_message=$7
+        WHERE log_id=$1 AND status='RUNNING'""",
+        [log_id, "SUCCESS" if success else "FAILED", result["status"], result.get("dates_processed", 0),
+         int((time.monotonic()-started)*1000), json.dumps(result, allow_nan=False),
+         None if success else result.get("reason", "Incomplete EOD run")])
+    if count != 1:
+        raise EODSafetyError("EOD log finalization unconfirmed; no historical log was changed")
+
+
+TABLE_KEYS = {
+    "market_features_daily": ("date",), "regime_inference_daily": ("date",),
+    "portfolio_simulations_daily": ("variant", "date"),
+    "portfolio_allocations_daily": ("variant", "date"),
+    "benchmark_simulations_daily": ("benchmark_name", "date"),
+}
+
+
+def _sql_value(value):
+    # Preserve the existing engine's numerical calculations; just bind scalars.
+    return value.item() if hasattr(value, "item") else value
+
+
+def publish_session(db, records, day, previous):
+    queries = [{"query": "SELECT pg_advisory_xact_lock(hashtext($1))", "params": ["eod:" + EXPECTED_BRANCH + ":" + day]}]
+    # Inside the serializable transaction, fail rather than revise an existing
+    # session or publish from an outdated predecessor after another writer wins.
+    guard = " AND ".join("NOT EXISTS (SELECT 1 FROM " + t + " WHERE date=$1::date)" for t in TABLE_KEYS)
+    predecessor = " AND ".join("(SELECT MAX(date) FROM " + t + ")=$2::date" for t in TABLE_KEYS)
+    queries.append({"query": "SELECT 1 / CASE WHEN " + guard + " AND " + predecessor + " THEN 1 ELSE 0 END AS continuity_guard", "params": [day, previous]})
+    expected_counts = {"market_features_daily": 1, "regime_inference_daily": 1,
+                       "portfolio_simulations_daily": 4, "portfolio_allocations_daily": 4,
+                       "benchmark_simulations_daily": 2}
+    for table, count in expected_counts.items():
+        rows = [r for r in records[table] if r["date"] == day]
+        if len(rows) != count:
+            raise EODSafetyError("Refusing incomplete EOD session bundle")
+        for row in rows:
+            columns = list(row)
+            values = [_sql_value(row[c]) for c in columns]
+            # Column names come only from the existing fixed record constructors.
+            queries.append({"query": "INSERT INTO " + table + " (" + ",".join(columns) + ") VALUES (" +
+                ",".join("$" + str(i+1) for i in range(len(columns))) + ")", "params": values})
+    checks = " AND ".join("(SELECT count(*) FROM " + t + " WHERE date=$1::date)=" + str(n) for t, n in expected_counts.items())
+    queries.append({"query": "SELECT 1 / CASE WHEN " + checks + " THEN 1 ELSE 0 END AS publication_guard", "params": [day]})
+    db.execute_transaction(queries)
+
+
+def _calculate_records(db, new_dates, latest_infer_str, calendar):
     # Load price history for feature adapter and returns
     prices_raw = db.query("""
         SELECT symbol, date::text as date, close
@@ -195,7 +302,7 @@ def run_pipeline(target_date: Optional[str] = None, trigger_type: str = "daily_c
         logger.info(f"Processing session {d_str} (prior: {prev_date_str})...")
         d_ts = pd.to_datetime(d_str)
         prev_d_ts = pd.to_datetime(prev_date_str)
-        next_d_str = new_dates[idx + 1] if idx + 1 < len(new_dates) else (datetime.strptime(d_str, "%Y-%m-%d").date() + timedelta(days=3)).strftime("%Y-%m-%d")
+        next_d_str = calendar.next_session(date.fromisoformat(d_str)).isoformat()
 
         sub_prices = full_price_pivot.loc[:d_ts]
         window_prices = sub_prices.iloc[-250:] if len(sub_prices) >= 250 else sub_prices
@@ -365,82 +472,81 @@ def run_pipeline(target_date: Optional[str] = None, trigger_type: str = "daily_c
         incumbent_regime = accepted_regime
         prev_date_str = d_str
 
-    # Persist all records atomically per table
-    logger.info("Persisting calculated records to Neon PostgreSQL...")
+    return {"market_features_daily": rows_features, "regime_inference_daily": rows_inference,
+            "portfolio_simulations_daily": rows_simulations, "portfolio_allocations_daily": rows_allocations,
+            "benchmark_simulations_daily": rows_benchmarks}
 
-    # A. market_features_daily
-    feat_vals = [
-        f"('{r['date']}', '{r['period']}', '{r['features_raw']}'::jsonb, '{r['features_robust_scaled']}'::jsonb)"
-        for r in rows_features
-    ]
-    db.execute(
-        f"INSERT INTO market_features_daily (date, period, features_raw, features_robust_scaled) "
-        f"VALUES {', '.join(feat_vals)} "
-        f"ON CONFLICT (date) DO UPDATE SET features_raw = EXCLUDED.features_raw, features_robust_scaled = EXCLUDED.features_robust_scaled;"
-    )
 
-    # B. regime_inference_daily
-    inf_vals = [
-        f"('{r['date']}', '{r['period']}', {r['prob_0']:.8f}, {r['prob_1']:.8f}, {r['prob_2']:.8f}, {r['prob_3']:.8f}, {r['prob_4']:.8f}, {r['prob_5']:.8f}, {r['raw_argmax']}, {r['max_probability']:.8f}, {r['is_confident']}, {r['accepted_regime']})"
-        for r in rows_inference
-    ]
-    db.execute(
-        f"INSERT INTO regime_inference_daily (date, period, prob_0, prob_1, prob_2, prob_3, prob_4, prob_5, raw_argmax, max_probability, is_confident, accepted_regime) "
-        f"VALUES {', '.join(inf_vals)} "
-        f"ON CONFLICT (date) DO UPDATE SET prob_0 = EXCLUDED.prob_0, accepted_regime = EXCLUDED.accepted_regime;"
-    )
+def run_pipeline(target_date=None, trigger_type="daily_cron", *, db=None, calendar=None,
+                 clock=None, expected_database="neondb"):
+    started = time.monotonic()
+    log_id = None
+    client = db
+    try:
+        client = client if client is not None else get_db_client()
+        identity = verify_eod_target(client, expected_database)
+        calendar = calendar or TradingCalendar()
+        now = clock() if clock else datetime.now(IST)
+        eligible = calendar.latest_completed_session(now)
+        target = date.fromisoformat(target_date) if target_date else eligible
+        if target > now.astimezone(IST).date():
+            raise EODSafetyError("A future target date is not permitted")
+        # A holiday manual request resolves to its latest actual completed session.
+        while not calendar.is_session(target):
+            target -= timedelta(days=1)
+        if target > eligible:
+            raise EODSafetyError("Requested session is not yet eligible for EOD collection")
+        anchor = last_complete_session(client, calendar)
+        if anchor > eligible:
+            raise EODSafetyError("Stored session is beyond the completed-session boundary")
+        if (target-anchor).days > 90:
+            raise EODSafetyError("RECOVERY_REQUIRED: EOD recovery exceeds the 90-day bound")
+        expected = [d.isoformat() for d in calendar.sessions(anchor+timedelta(days=1), target)]
+        log_id = start_eod_run(client, target.isoformat(), trigger_type, identity)
+        if not expected:
+            result = {"status": "UP_TO_DATE", "latest_session": anchor.isoformat(), "dates_processed": 0}
+        else:
+            ingestion = CatchupIngestionService(db_client=client, append_only=True, persist_recovery_queue=False)
+            fetched = ingestion.run_catchup(target_date=target.isoformat(), trigger_type=trigger_type, expected_dates=expected)
+            if fetched.get("status") != "FETCH_COMPLETE" or fetched.get("missing"):
+                result = {"status": "PARTIAL", "reason": "Expected trading-session candles are incomplete",
+                          "fetch_res": fetched, "dates_processed": 0}
+            else:
+                # Confirm exact eight-index coverage before running the frozen engines.
+                coverage = client.query("SELECT date::text AS date,array_agg(symbol ORDER BY symbol) AS symbols FROM index_candles_daily WHERE date=ANY($1::date[]) GROUP BY date ORDER BY date", [expected])
+                if {r["date"][:10] for r in coverage} != set(expected) or any(set(r["symbols"]) != set(REQUIRED_INDEX_SYMBOLS) for r in coverage):
+                    raise EODSafetyError("Eight-index session coverage is incomplete")
+                records = _calculate_records(client, expected, anchor.isoformat(), calendar)
+                previous = anchor.isoformat()
+                for day in expected:
+                    publish_session(client, records, day, previous)
+                    previous = day
+                if last_complete_session(client, calendar).isoformat() != target.isoformat():
+                    raise EODSafetyError("Post-publication completeness check failed")
+                result = {"status": "SUCCESS", "latest_session": target.isoformat(), "dates_processed": len(expected)}
+        finish_eod_run(client, log_id, result, started)
+        return result
+    except Exception as error:
+        result = {"status": "FAILED", "reason": _safe_error(error, getattr(client, "connection_string", "")),
+                  "error_type": type(error).__name__}
+        if log_id is not None:
+            try:
+                finish_eod_run(client, log_id, result, started)
+            except Exception:
+                result["log_finalization"] = "UNCONFIRMED"
+        logger.error("EOD run failed (%s): %s", type(error).__name__, result["reason"])
+        return result
 
-    # C. portfolio_simulations_daily
-    sim_vals = [
-        f"('{r['variant']}', '{r['date']}', '{r['period']}', {r['rebalance_executed']}, {r['rebalance_bypassed_r3']}, {r['actual_turnover']:.6f}, {r['nominal_turnover']:.6f}, {r['transaction_cost']:.6f}, {r['gross_return']:.8f}, {r['net_return']:.8f}, {r['gross_nav']:.6f}, {r['net_nav']:.6f}, {r['accepted_regime']}, {r['w_post_auto']:.6f}, {r['w_post_bank']:.6f}, {r['w_post_fmcg']:.6f}, {r['w_post_it']:.6f}, {r['w_post_metal']:.6f}, {r['w_post_pharma']:.6f}, {r['w_post_cash']:.6f})"
-        for r in rows_simulations
-    ]
-    db.execute(
-        f"INSERT INTO portfolio_simulations_daily (variant, date, period, rebalance_executed, rebalance_bypassed_r3, actual_turnover, nominal_turnover, transaction_cost, gross_return, net_return, gross_nav, net_nav, accepted_regime, w_post_auto, w_post_bank, w_post_fmcg, w_post_it, w_post_metal, w_post_pharma, w_post_cash) "
-        f"VALUES {', '.join(sim_vals)} "
-        f"ON CONFLICT (variant, date) DO UPDATE SET net_nav = EXCLUDED.net_nav;"
-    )
 
-    # D. portfolio_allocations_daily
-    alloc_vals = [
-        f"('{r['variant']}', '{r['date']}', '{r['exec_date']}', '{r['period']}', {r['incumbent_regime_before']}, {r['incumbent_regime_after']}, {r['holding_days_before']}, {r['holding_days_after']}, {r['rebalance_triggered']}, {r['rebalance_bypassed_r3']}, {r['turnover']:.6f}, {r['transaction_cost_rate']:.6f}, {r['w_nifty50']:.6f}, {r['w_auto']:.6f}, {r['w_bank']:.6f}, {r['w_fmcg']:.6f}, {r['w_it']:.6f}, {r['w_metal']:.6f}, {r['w_pharma']:.6f}, {r['w_cash']:.6f})"
-        for r in rows_allocations
-    ]
-    db.execute(
-        f"INSERT INTO portfolio_allocations_daily (variant, date, exec_date, period, incumbent_regime_before, incumbent_regime_after, holding_days_before, holding_days_after, rebalance_triggered, rebalance_bypassed_r3, turnover, transaction_cost_rate, w_nifty50, w_auto, w_bank, w_fmcg, w_it, w_metal, w_pharma, w_cash) "
-        f"VALUES {', '.join(alloc_vals)} "
-        f"ON CONFLICT (variant, date) DO UPDATE SET holding_days_after = EXCLUDED.holding_days_after;"
-    )
-
-    # E. benchmark_simulations_daily
-    bmark_vals = [
-        f"('{r['benchmark_name']}', '{r['date']}', '{r['period']}', {r['net_return']:.8f}, {r['net_nav']:.6f}, {r['actual_turnover']:.6f}, {r['transaction_cost']:.6f})"
-        for r in rows_benchmarks
-    ]
-    db.execute(
-        f"INSERT INTO benchmark_simulations_daily (benchmark_name, date, period, net_return, net_nav, actual_turnover, transaction_cost) "
-        f"VALUES {', '.join(bmark_vals)} "
-        f"ON CONFLICT (benchmark_name, date) DO UPDATE SET net_nav = EXCLUDED.net_nav;"
-    )
-
-    duration_ms = int((time.time() - start_time) * 1000)
-    logger.info("=" * 65)
-    logger.info(f"DAILY EOD PIPELINE EXECUTION COMPLETED IN {duration_ms} ms.")
-    logger.info("=" * 65)
-
-    return {
-        "status": "SUCCESS",
-        "dates_processed": len(new_dates),
-        "latest_session": new_dates[-1],
-        "duration_ms": duration_ms,
-    }
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Daily EOD Pipeline Orchestrator")
+    parser.add_argument("--date", type=str, default=None)
+    parser.add_argument("--trigger", type=str, default="daily_cron")
+    args = parser.parse_args(argv)
+    result = run_pipeline(target_date=args.date, trigger_type=args.trigger)
+    print(json.dumps(result, allow_nan=False, indent=2))
+    return 0 if result.get("status") in ("SUCCESS", "UP_TO_DATE") else 1
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Daily EOD Pipeline Orchestrator")
-    parser.add_argument("--date", type=str, default=None, help="Target session date (YYYY-MM-DD)")
-    parser.add_argument("--trigger", type=str, default="daily_cron", help="Trigger type")
-    args = parser.parse_args()
-
-    res = run_pipeline(target_date=args.date, trigger_type=args.trigger)
-    print(json.dumps(res, indent=2))
+    raise SystemExit(main())
