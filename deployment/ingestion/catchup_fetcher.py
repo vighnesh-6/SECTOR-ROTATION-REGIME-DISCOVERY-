@@ -16,11 +16,16 @@ Uses Yahoo Finance (yfinance) as the primary data provider:
 from __future__ import annotations
 
 import json
+import csv
+import io
+import hashlib
 import logging
 import math
 import os
 import sys
 import time
+import ssl
+import urllib.request
 from datetime import datetime, date, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -59,6 +64,7 @@ class CatchupIngestionService:
         self.persist_recovery_queue = persist_recovery_queue
         self.max_retries = max_retries_per_index
         self.retry_delay = retry_delay_seconds
+        self._nse_reports = {}
         if self.persist_recovery_queue:
             STATE_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -299,6 +305,56 @@ class CatchupIngestionService:
                 )
             raise
 
+    def official_nse_session(self, day: str) -> Dict[str, Dict[str, Any]]:
+        """Read one dated official report; accept only a complete eight-index set.
+
+        Index closing values also supply the existing index adj_close convention.
+        An unpublished volume (India VIX) remains SQL NULL, never an invented zero.
+        No stored candle is revised and no report is inferred from another date.
+        """
+        if day in self._nse_reports:
+            return self._nse_reports[day]['candles']
+        stamp = date.fromisoformat(day).strftime('%d%m%Y')
+        url = 'https://nsearchives.nseindia.com/content/indices/ind_close_all_' + stamp + '.csv'
+        request = urllib.request.Request(url, headers={'User-Agent':'Mozilla/5.0', 'Accept':'text/csv'})
+        with urllib.request.urlopen(request, context=ssl.create_default_context(), timeout=30) as response:
+            if response.geturl() != url:
+                raise ValueError('Official NSE archive redirected; coverage is unverified')
+            data = response.read(4 * 1024 * 1024 + 1)
+        if len(data) > 4 * 1024 * 1024:
+            raise ValueError('Official NSE archive exceeds the bounded response size')
+        reader = csv.DictReader(io.StringIO(data.decode('utf-8-sig')))
+        required = {'Index Name','Index Date','Open Index Value','High Index Value','Low Index Value','Closing Index Value','Volume'}
+        if not required.issubset(reader.fieldnames or []):
+            raise ValueError('Official NSE archive has unexpected columns')
+        candles = {}
+        for row in reader:
+            symbol = row['Index Name'].strip().upper()
+            if symbol not in INDEX_TICKER_MAP:
+                continue
+            if symbol in candles or datetime.strptime(row['Index Date'].strip(), '%d-%m-%Y').date().isoformat() != day:
+                raise ValueError('Official NSE archive contains duplicate or wrong-date universe rows')
+            values = {k:float(row[c]) for k,c in [('open','Open Index Value'),('high','High Index Value'),('low','Low Index Value'),('close','Closing Index Value')]}
+            if (not all(math.isfinite(v) and v > 0 for v in values.values()) or
+                values['high'] < max(values['open'],values['close']) or
+                values['low'] > min(values['open'],values['close'])):
+                raise ValueError('Official NSE archive contains invalid prices')
+            volume_text = row['Volume'].strip()
+            if volume_text == '-' and symbol == 'INDIA VIX':
+                volume = None
+            else:
+                volume = int(volume_text)
+                if volume < 0:
+                    raise ValueError('Official NSE archive contains invalid volume')
+            candles[symbol] = {'symbol':symbol,'date':day,**values,'adj_close':values['close'],
+                               'volume':volume,'source':'nse_official_indices'}
+        if set(candles) != set(INDEX_TICKER_MAP):
+            raise ValueError('Official NSE archive does not cover all eight indices')
+        evidence = {'date':day,'url':url,'sha256':hashlib.sha256(data).hexdigest(),'validated_indices':len(candles)}
+        self._nse_reports[day] = {'candles':candles,'evidence':evidence}
+        logger.info('Verified official NSE fallback: %s', json.dumps(evidence, sort_keys=True))
+        return candles
+
     def collect_expected_sessions(self, expected_dates: List[str]) -> Dict[str, Any]:
         """EOD orchestrator path: recover explicit calendar sessions, not MAX(date).
 
@@ -319,9 +375,9 @@ class CatchupIngestionService:
         for symbol in INDEX_TICKER_MAP:
             complete = False
             for attempt in range(self.max_retries):
+                found = {}
                 try:
                     candles = self.yf_client.fetch_historical_candles(symbol, days[0], days[-1])
-                    found = {}
                     for candle in candles:
                         d = candle.get("date")
                         if d not in expected:
@@ -334,6 +390,12 @@ class CatchupIngestionService:
                         if float(candle["high"]) < max(float(candle["open"]), float(candle["close"])) or float(candle["low"]) > min(float(candle["open"]), float(candle["close"])):
                             raise ValueError("Invalid source candle range")
                         found[d] = candle
+                except Exception as error:
+                    found = {}
+                    logger.warning('Primary source failed validation/fetch for %s (%s)',symbol,type(error).__name__)
+                try:
+                    for missing_day in sorted(expected - set(found)):
+                        found[missing_day] = self.official_nse_session(missing_day)[symbol]
                     # Identical existing candles are no-ops. Revisions fail closed.
                     summary = self.reconciler.ingest_batch([found[d] for d in sorted(found)])
                     for key in totals:
@@ -353,4 +415,5 @@ class CatchupIngestionService:
             if not complete:
                 missing.append(symbol)
         return {"status": "PARTIAL_SUCCESS" if missing else "FETCH_COMPLETE",
-                **totals, "missing": missing, "expected_sessions": days}
+                **totals, "missing": missing, "expected_sessions": days,
+                "official_nse_reports":[self._nse_reports[d]['evidence'] for d in sorted(self._nse_reports)]}

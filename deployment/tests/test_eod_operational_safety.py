@@ -26,7 +26,8 @@ def forbid_real_io(monkeypatch, request):
     def blocked(*args, **kwargs):
         raise AssertionError("Offline EOD suite forbids network and default database access")
     if (os.environ.get("EOD_OPS_INTEGRATION") == "1" and
-            request.node.name == "test_disposable_neon_atomicity_idempotency_and_recovery"):
+            request.node.name in ("test_disposable_neon_atomicity_idempotency_and_recovery",
+                                  "test_official_nse_disposable_persistence_and_concurrency")):
         # The opt-in integration test below validates its explicit disposable
         # target before SQL. Default-client access remains forbidden.
         monkeypatch.setattr(eod, "get_db_client", blocked)
@@ -170,7 +171,7 @@ def test_calendar_special_session_holiday_and_year_boundary():
 
 def test_source_empty_feed_is_not_success_and_no_queue_file_is_created():
     db = client(); yf = MagicMock(); yf.fetch_historical_candles.return_value = []
-    with patch("pathlib.Path.mkdir") as mkdir:
+    with patch("pathlib.Path.mkdir") as mkdir, patch.object(CatchupIngestionService, 'official_nse_session', side_effect=ValueError('Archive unavailable')):
         service = CatchupIngestionService(db_client=db,yf_client=yf,max_retries_per_index=1,persist_recovery_queue=False,append_only=True)
         result = service.run_catchup(expected_dates=["2026-09-21"])
     mkdir.assert_not_called()
@@ -206,6 +207,86 @@ def test_http_batch_is_serializable_and_retries_only_rolled_back_errors():
 def test_diagnostics_redact_connection_and_password():
     text = eod._safe_error(RuntimeError("bad postgresql://u:npg_SENSITIVE@host/db password=npg_OTHER"))
     assert "SENSITIVE" not in text and "npg_" not in text and "postgresql://" not in text
+
+
+def nse_report(day='08-11-2026'):
+    lines=['Index Name,Index Date,Open Index Value,High Index Value,Low Index Value,Closing Index Value,Volume']
+    for symbol in eod.REQUIRED_INDEX_SYMBOLS:
+        lines.append(','.join([symbol,day,'100','105','95','101','-' if symbol=='INDIA VIX' else '123']))
+    return ('\n'.join(lines)+'\n').encode()
+
+
+def nse_response(data):
+    r=MagicMock()
+    r.__enter__.return_value.read.return_value=data
+    r.__enter__.return_value.geturl.return_value='https://nsearchives.nseindia.com/content/indices/ind_close_all_08112026.csv'
+    return r
+
+
+def test_nse_fallback_exact_date_all_eight_cached_and_null_vix_volume():
+    db=client(); yf=MagicMock(); yf.fetch_historical_candles.return_value=[]
+    service=CatchupIngestionService(db_client=db,yf_client=yf,max_retries_per_index=1,persist_recovery_queue=False,append_only=True)
+    service.reconciler=MagicMock();service.reconciler.ingest_batch.return_value={'inserted':1,'duplicate':0,'reconciled':0}
+    with patch('urllib.request.urlopen',return_value=nse_response(nse_report())) as send:
+        result=service.collect_expected_sessions(['2026-11-08'])
+    assert result['status']=='FETCH_COMPLETE' and result['inserted']==8
+    assert send.call_count==1
+    assert result['official_nse_reports'][0]['validated_indices']==8
+    assert len(result['official_nse_reports'][0]['sha256'])==64
+    candles=[c.args[0][0] for c in service.reconciler.ingest_batch.call_args_list]
+    assert next(c for c in candles if c['symbol']=='INDIA VIX')['volume'] is None
+    assert all(c['source']=='nse_official_indices' and c['date']=='2026-11-08' for c in candles)
+
+
+@pytest.mark.parametrize('bad',[
+    nse_report('09-11-2026'),
+    nse_report()+nse_report().splitlines()[1]+b'\n',
+    b'not,a,report\n',
+    nse_report().replace(b'100,105,95,101',b'100,99,95,101'),
+    nse_report().replace(b'100,105,95,101',b'100,105,95,nan'),
+    nse_report().replace(b',123',b',-1'),
+    b'\n'.join(nse_report().splitlines()[:-1]),
+])
+def test_nse_archive_rejects_incomplete_wrong_date_or_invalid_rows(bad):
+    service=CatchupIngestionService(db_client=client(),yf_client=MagicMock(),persist_recovery_queue=False)
+    with patch('urllib.request.urlopen',return_value=nse_response(bad)),pytest.raises(ValueError):
+        service.official_nse_session('2026-11-08')
+    service.db.execute.assert_not_called()
+
+
+def test_nse_fallback_never_requested_when_primary_is_complete():
+    yf=MagicMock()
+    yf.fetch_historical_candles.side_effect=lambda symbol,*a:[{'symbol':symbol,'date':'2026-11-08','open':100,'high':105,'low':95,'close':101,'adj_close':101,'volume':0}]
+    service=CatchupIngestionService(db_client=client(),yf_client=yf,persist_recovery_queue=False,append_only=True)
+    service.reconciler=MagicMock();service.reconciler.ingest_batch.return_value={'inserted':0,'duplicate':1,'reconciled':0}
+    with patch.object(service,'official_nse_session') as fallback:
+        assert service.collect_expected_sessions(['2026-11-08'])['status']=='FETCH_COMPLETE'
+    fallback.assert_not_called()
+
+
+@pytest.mark.skipif(os.environ.get('EOD_OPS_INTEGRATION') != '1',reason='Explicit disposable-database opt-in required')
+def test_official_nse_disposable_persistence_and_concurrency():
+    from concurrent.futures import ThreadPoolExecutor
+    connection=os.environ.get('EOD_TEST_DATABASE_URL','')
+    route=MagicMock(connection_string=connection)
+    route.query.return_value=[{**IDENTITY,'database':'eod_ops_test'}]
+    eod.verify_eod_target(route,'eod_ops_test')
+    db=NeonClient(connection_string=connection);eod.verify_eod_target(db,'eod_ops_test')
+    before=db.query("SELECT count(*)::int AS n,md5(COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text,'[]')) AS hash FROM index_candles_daily t WHERE date<>'2026-11-08'")
+    def run(_):
+        yf=MagicMock();yf.fetch_historical_candles.return_value=[]
+        service=CatchupIngestionService(db_client=NeonClient(connection_string=connection),yf_client=yf,max_retries_per_index=1,persist_recovery_queue=False,append_only=True)
+        eod.verify_eod_target(service.db,'eod_ops_test')
+        return service.collect_expected_sessions(['2026-11-08'])
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results=list(pool.map(run,range(2)))
+    assert all(r['status']=='FETCH_COMPLETE' for r in results)
+    assert sum(r['inserted'] for r in results) in (0,8)
+    rows=db.query("SELECT symbol,volume,data_source FROM index_candles_daily WHERE date='2026-11-08'")
+    assert len(rows)==8 and all(r['data_source']=='nse_official_indices' for r in rows)
+    assert next(r for r in rows if r['symbol']=='INDIA VIX')['volume'] is None
+    assert run(0)['inserted']==0
+    assert before==db.query("SELECT count(*)::int AS n,md5(COALESCE(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text)::text,'[]')) AS hash FROM index_candles_daily t WHERE date<>'2026-11-08'")
 
 
 @pytest.mark.skipif(os.environ.get("EOD_OPS_INTEGRATION") != "1", reason="Explicit disposable-database opt-in required")

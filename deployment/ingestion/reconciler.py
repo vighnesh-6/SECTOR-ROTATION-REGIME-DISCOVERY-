@@ -85,7 +85,7 @@ class CandleReconciler:
             ("high", float(existing["high"]), float(high_val)),
             ("low", float(existing["low"]), float(low_val)),
             ("close", float(existing["close"]), float(close_val)),
-            ("volume", float(existing["volume"]) if existing.get("volume") is not None else 0.0, float(volume_val)),
+            ("volume", float(existing["volume"]) if existing.get("volume") is not None else 0.0, float(volume_val) if volume_val is not None else 0.0),
         ]
         if not self.allow_revision_updates:
             fields.append(("adj_close", float(existing["adj_close"]), float(adj_close_val)))
