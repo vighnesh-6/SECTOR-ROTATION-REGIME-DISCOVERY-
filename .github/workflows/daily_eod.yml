@@ -1,4 +1,5 @@
 name: Daily EOD Market Data Ingestion & Regime Pipeline
+run-name: EOD ${{ inputs.dispatch_key || github.event.schedule || github.run_id }}
 
 'on':
   schedule:
@@ -16,6 +17,15 @@ name: Daily EOD Market Data Ingestion & Regime Pipeline
         description: 'Target session date for manual catch-up or rerun (YYYY-MM-DD)'
         required: false
         default: ''
+      dispatch_key:
+        description: 'External scheduler idempotency/correlation key'
+        required: false
+        default: ''
+      trigger_origin:
+        description: 'Operational trigger provenance'
+        type: choice
+        options: [manual_dispatch, external_scheduler]
+        default: manual_dispatch
 
 concurrency:
   group: daily-eod-pipeline
@@ -44,10 +54,15 @@ jobs:
       - name: Execute Daily EOD Pipeline
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL || secrets.NEON_DATABASE_URL }}
+          REQUESTED_TARGET_DATE: ${{ inputs.target_date }}
+          REQUESTED_ORIGIN: ${{ inputs.trigger_origin }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          if [ -n "${{ github.event.inputs.target_date }}" ]; then
-            python deployment/scripts/run_daily_eod.py --date "${{ github.event.inputs.target_date }}" --trigger "manual_dispatch"
-          else
-            python deployment/scripts/run_daily_eod.py --trigger "scheduled_cron"
-          fi
+          set -euo pipefail
+          origin=manual_dispatch
+          if [[ "$EVENT_NAME" == schedule ]]; then origin=scheduled_cron; fi
+          if [[ "$EVENT_NAME" == workflow_dispatch && "$REQUESTED_ORIGIN" == external_scheduler ]]; then origin=external_scheduler; fi
+          args=(--trigger "$origin")
+          if [[ -n "$REQUESTED_TARGET_DATE" ]]; then args+=(--date "$REQUESTED_TARGET_DATE"); fi
+          python deployment/scripts/run_daily_eod.py "${args[@]}"
 

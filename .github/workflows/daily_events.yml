@@ -1,4 +1,5 @@
 name: Independent Event Automation
+run-name: Events ${{ inputs.dispatch_key || github.event.schedule || github.run_id }}
 
 'on':
   schedule:
@@ -19,6 +20,15 @@ name: Independent Event Automation
         description: 'Optional recent recovery start (YYYY-MM-DD); RSS coverage is checked'
         type: string
         default: ''
+      dispatch_key:
+        description: 'External scheduler idempotency/correlation key'
+        required: false
+        default: ''
+      trigger_origin:
+        description: 'Operational trigger provenance'
+        type: choice
+        options: [manual_dispatch, external_scheduler]
+        default: manual_dispatch
 
 permissions:
   contents: read

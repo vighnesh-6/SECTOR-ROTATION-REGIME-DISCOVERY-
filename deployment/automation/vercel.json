@@ -1,0 +1,19 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/dispatch.mjs": {
+      "maxDuration": 120,
+      "experimentalTriggers": [{ "type": "schedule/v1beta" }]
+    }
+  },
+  "schedules": {
+    "eod-primary": { "schedule": "0 19 * * 1-5", "timezone": "Asia/Kolkata", "jitter": 15, "function": "api/dispatch" },
+    "eod-retry-1": { "schedule": "30 19 * * 1-5", "timezone": "Asia/Kolkata", "jitter": 15, "function": "api/dispatch" },
+    "eod-retry-2": { "schedule": "0 20 * * 1-5", "timezone": "Asia/Kolkata", "jitter": 15, "function": "api/dispatch" },
+    "eod-retry-3": { "schedule": "30 20 * * 1-5", "timezone": "Asia/Kolkata", "jitter": 15, "function": "api/dispatch" },
+    "events-primary": { "schedule": "0 21 * * 1-5", "timezone": "Asia/Kolkata", "jitter": 15, "function": "api/dispatch" },
+    "events-health": { "schedule": "0 23 * * 1-5", "timezone": "Asia/Kolkata", "jitter": 15, "function": "api/dispatch" },
+    "eod-watchdog": { "schedule": "*/15 19-23 * * 1-5", "timezone": "Asia/Kolkata", "jitter": 15, "function": "api/dispatch" },
+    "events-watchdog": { "schedule": "*/15 21-23 * * 1-5", "timezone": "Asia/Kolkata", "jitter": 15, "function": "api/dispatch" }
+  }
+}
