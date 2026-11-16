@@ -312,8 +312,8 @@ def build_revised_document():
     
     students = [
         ("Vighnesh Somani", "Roll Number: 240946"),
-        ("Ayush Akku", "Roll Number: Unassigned"),
-        ("Anmol Sinha", "Roll Number: Unassigned"),
+        ("Ayush Akku", "Roll Number: 240419"),
+        ("Anmol Sinha", "Roll Number: 240384"),
     ]
     for s_name, s_roll in students:
         p_s = doc.add_paragraph()
@@ -388,8 +388,8 @@ def build_revised_document():
     
     members_info = [
         ("Vighnesh Somani", "Roll No: 240946"),
-        ("Ayush Akku", "Roll No: Unassigned"),
-        ("Anmol Sinha", "Roll No: Unassigned"),
+        ("Ayush Akku", "Roll No: 240419"),
+        ("Anmol Sinha", "Roll No: 240384"),
     ]
     for row_idx, (m_name, m_roll) in enumerate(members_info):
         c0 = sig_table.cell(row_idx, 0)
@@ -974,7 +974,7 @@ def build_revised_document():
     team_widths = [Inches(2.5), Inches(1.3), Inches(1.2), Inches(1.2)]
     
     team_data = [
-        ("Activity", "Vighnesh Somani\n(Roll: 240946)", "Ayush Akku\n(Roll: Unassigned)", "Anmol Sinha\n(Roll: Unassigned)"),
+        ("Activity", "Vighnesh Somani\n(Roll: 240946)", "Ayush Akku\n(Roll: 240419)", "Anmol Sinha\n(Roll: 240384)"),
         ("Data Preprocessing & EDA", "Primary (P)", "Secondary (S)", "—"),
         ("Feature Engineering", "Primary (P)", "—", "Secondary (S)"),
         ("Model Building", "Primary (P)", "Secondary (S)", "Secondary (S)"),
