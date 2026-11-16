@@ -201,17 +201,19 @@ def add_code_block(doc, code_str, title=""):
     p_after.paragraph_format.space_before = Pt(0)
     p_after.paragraph_format.space_after = Pt(6)
 
-def style_table(table, header_bg="1E293B", col_widths=None):
+def style_table(table, header_bg="1E293B", col_widths=None, pad_y=100, pad_x=120, font_sz=9.0):
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
     set_table_borders(table, color="D3D3D3", sz="4", val="single")
     
     for i, row in enumerate(table.rows):
         is_header = (i == 0)
+        trPr = row._tr.get_or_add_trPr()
+        trPr.append(parse_xml(r'<w:cantSplit xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>'))
         for j, cell in enumerate(row.cells):
             if col_widths and j < len(col_widths):
                 cell.width = col_widths[j]
-            set_cell_margins(cell, top=100, bottom=100, left=120, right=120)
+            set_cell_margins(cell, top=pad_y, bottom=pad_y, left=pad_x, right=pad_x)
             if is_header:
                 set_cell_background(cell, header_bg)
             else:
@@ -225,9 +227,9 @@ def style_table(table, header_bg="1E293B", col_widths=None):
                 p.paragraph_format.line_spacing = 1.05
                 for r in p.runs:
                     if is_header:
-                        format_run(r, font_name="Times New Roman", size_pt=9.5, bold=True, color_rgb=(255, 255, 255))
+                        format_run(r, font_name="Times New Roman", size_pt=font_sz + 0.5, bold=True, color_rgb=(255, 255, 255))
                     else:
-                        format_run(r, font_name="Times New Roman", size_pt=9.0, bold=False, color_rgb=(15, 23, 42))
+                        format_run(r, font_name="Times New Roman", size_pt=font_sz, bold=False, color_rgb=(15, 23, 42))
 
 def add_xml_page_number(run):
     """Insert a dynamic PAGE field into a Word run."""
@@ -505,7 +507,7 @@ def build_revised_document():
           
     add_p(doc,
           "Machine learning offers an objective, data-driven alternative. Instead of waiting for delayed surveys, machine learning algorithms can analyze "
-          "daily market price movements, momentum trends, localized volatility, and option-implied fear gauges (such as the India VIX) in real time. "
+          "daily market price movements, momentum trends, localized volatility, and option-implied fear gauges (such as the India VIX) on an end-of-day basis. "
           "Furthermore, because market regimes do not come with pre-assigned labels broadcast by the exchange, unsupervised machine learning—specifically "
           "probabilistic Hidden Markov Models (HMM)—is uniquely suited for this challenge. Unsupervised models discover the natural clusters and structural "
           "states hidden within historical data purely from the mathematical geometry of the feature space, without human bias.")
@@ -517,7 +519,7 @@ def build_revised_document():
     add_bullet_item(doc, "1. Automated Regime Discovery: ", "An unsupervised Hidden Markov Model that analyzes daily market data across eight key NSE indices and identifies six distinct, economically meaningful market regimes.")
     add_bullet_item(doc, "2. Systematic Rotation Rules: ", "An objective decision engine that maps the detected market regime into recommended sector allocations (selecting the top two outperforming sectors for each regime) while enforcing risk controls and realistic trading rules.")
     add_bullet_item(doc, "3. Realistic Portfolio Simulation: ", "A daily portfolio backtesting engine that tracks investment performance over a multi-year period, incorporating realistic transaction costs (15 basis points per trade) and strict execution timing.")
-    add_bullet_item(doc, "4. Production Web Application: ", "A deployed, interactive web dashboard that provides real-time market regime tracking, active sector recommendations, portfolio analytics, and risk monitoring.")
+    add_bullet_item(doc, "4. Production Web Application: ", "A deployed, interactive web dashboard that provides daily-updated market regime tracking, active sector recommendations, portfolio analytics, and risk monitoring.")
     
     # =============================================================
     # CHAPTER 2: PROBLEM STATEMENT
@@ -529,7 +531,7 @@ def build_revised_document():
           "Investors in the Indian equity market face a fundamental challenge: passive buy-and-hold sector investing fails to protect capital during "
           "market downturns, while human-driven sector timing is impaired by delayed economic reports, cognitive biases, and emotional trading. "
           "The core problem addressed in this work is the development of an automated, mathematically sound system that detects latent market regimes "
-          "in real time using daily market data, and translates those regime states into dynamic sector allocations that achieve superior risk-adjusted "
+          "using daily closing market data, and translates those end-of-day regime inferences into dynamic sector allocations that achieve superior risk-adjusted "
           "returns after accounting for trading friction.")
           
     add_heading_2(doc, "2.2 Limitations of Conventional Sector Selection Approaches")
@@ -575,34 +577,37 @@ def build_revised_document():
     
     add_heading_2(doc, "3.2 Data Ingestion, Sourcing, and Calendar Alignment")
     add_p(doc,
-          "Historical daily OHLCV data was acquired via Yahoo Finance and validated against official NSE bhavcopy historical records. "
-          "In `src/data_cleaning.py`, asynchronous holidays and non-trading days were reconciled. Exactly 1,886 synchronized trading sessions "
-          "were established from January 2, 2019 to September 18, 2026. Accounting for a rolling 200-day warmup window for feature calculations "
-          "yielded 1,687 aligned session rows (1,686 daily return intervals).")
+          "Historical daily OHLCV market data was acquired via Yahoo Finance and validated against official NSE bhavcopy historical records. "
+          "In `src/data_cleaning.py`, asynchronous holidays and non-trading days were reconciled across the eight canonical series to establish a single, authoritative trading calendar. "
+          "As verified in Appendix E, the empirical dataset spans three distinct, clearly differentiated temporal tiers:")
+    add_bullet_item(doc, "Unified Raw NSE Trading Calendar: ", "Exactly 1,886 synchronized trading sessions spanning January 2, 2019 to September 18, 2026.")
+    add_bullet_item(doc, "Rolling Feature Warm-Up Window: ", "The initial 200 trading sessions (January 2, 2019 to October 30, 2019) serve as the rolling lookback window required to compute 200-day momentum, trailing returns, and 63-day realized volatility metrics without lookahead bias.")
+    add_bullet_item(doc, "Feature-Ready Aligned Dataset: ", "Accounting for the 200-session warmup yields exactly 1,687 feature-complete trading sessions spanning October 31, 2019 to September 18, 2026 (yielding 1,686 consecutive daily return intervals for strategy backtesting).")
           
     add_heading_2(doc, "3.3 Temporal Data Partitioning")
-    add_bullet_item(doc, "Training Pool (In-Sample): ", "October 31, 2019 to December 31, 2024 (1,265 sessions / 1,264 daily return intervals, ~75.0% of sample). Used exclusively for feature exploration, cross-validation, regime discovery, and rule design.")
-    add_bullet_item(doc, "Holdout Pool (Protected Out-of-Sample): ", "January 2, 2025 to September 18, 2026 (422 sessions / 422 daily return intervals, ~25.0% of sample). Sealed during all model development stages.")
+    add_p(doc, "To ensure leak-proof model evaluation, the 1,687 feature-ready trading sessions are strictly partitioned into two non-overlapping pools:")
+    add_bullet_item(doc, "Training Pool (In-Sample): ", "October 31, 2019 to December 31, 2024 (1,265 trading sessions / 1,264 daily return intervals, ~75.0% of feature-ready sample). Used exclusively for feature exploration, cross-validation, regime discovery, and rule design.")
+    add_bullet_item(doc, "Holdout Pool (Protected Out-of-Sample): ", "January 2, 2025 to September 18, 2026 (422 trading sessions / 422 daily return intervals, ~25.0% of feature-ready sample). Sealed during all model development stages.")
     
     add_heading_3(doc, "Dataset Summary Table")
     ds_table = doc.add_table(rows=9, cols=6)
-    ds_widths = [Inches(1.5), Inches(1.0), Inches(0.8), Inches(1.6), Inches(0.8), Inches(1.3)]
+    ds_widths = [Inches(1.1), Inches(0.9), Inches(0.55), Inches(1.55), Inches(1.2), Inches(1.2)]
     ds_data = [
-        ("Asset Name", "NSE Symbol", "Constituents", "Economic Role / Sensitivity", "Sessions", "Aligned Coverage"),
-        ("NIFTY 50", "^NSEI", "50", "Broad Market Reference / Core Benchmark", "1,886", "2019-10-31 to 2026-09-18"),
-        ("INDIA VIX", "^INDIAVIX", "N/A", "Implied Volatility / Market Fear Gauge", "1,886", "2019-10-31 to 2026-09-18"),
-        ("NIFTY AUTO", "^CNXAUTO", "15", "Cyclical Consumer Discretionary", "1,886", "2019-10-31 to 2026-09-18"),
-        ("NIFTY BANK", "^NSEBANK", "12", "Cyclical Financials & Credit Liquidity", "1,886", "2019-10-31 to 2026-09-18"),
-        ("NIFTY FMCG", "^CNXFMCG", "15", "Non-Cyclical Defensive Consumption", "1,886", "2019-10-31 to 2026-09-18"),
-        ("NIFTY IT", "^CNXIT", "10", "Export Technology & USD Sensitivity", "1,886", "2019-10-31 to 2026-09-18"),
-        ("NIFTY METAL", "^CNXMETAL", "15", "Cyclical Commodities & Global Trade", "1,886", "2019-10-31 to 2026-09-18"),
-        ("NIFTY PHARMA", "^CNXPHARMA", "20", "Non-Cyclical Defensive Healthcare", "1,886", "2019-10-31 to 2026-09-18"),
+        ("Asset Name", "NSE Symbol", "Constituents", "Economic Role / Sensitivity", "Raw Calendar (Sessions)", "Feature-Ready Period (Sessions)"),
+        ("NIFTY 50", "^NSEI", "50", "Broad Market Reference / Core Benchmark", "2019-01-02 to 2026-09-18 (1,886)", "2019-10-31 to 2026-09-18 (1,687)"),
+        ("INDIA VIX", "^INDIAVIX", "N/A", "Implied Volatility / Market Fear Gauge", "2019-01-02 to 2026-09-18 (1,886)", "2019-10-31 to 2026-09-18 (1,687)"),
+        ("NIFTY AUTO", "^CNXAUTO", "15", "Cyclical Consumer Discretionary", "2019-01-02 to 2026-09-18 (1,886)", "2019-10-31 to 2026-09-18 (1,687)"),
+        ("NIFTY BANK", "^NSEBANK", "12", "Cyclical Financials & Credit Liquidity", "2019-01-02 to 2026-09-18 (1,886)", "2019-10-31 to 2026-09-18 (1,687)"),
+        ("NIFTY FMCG", "^CNXFMCG", "15", "Non-Cyclical Defensive Consumption", "2019-01-02 to 2026-09-18 (1,886)", "2019-10-31 to 2026-09-18 (1,687)"),
+        ("NIFTY IT", "^CNXIT", "10", "Export Technology & USD Sensitivity", "2019-01-02 to 2026-09-18 (1,886)", "2019-10-31 to 2026-09-18 (1,687)"),
+        ("NIFTY METAL", "^CNXMETAL", "15", "Cyclical Commodities & Global Trade", "2019-01-02 to 2026-09-18 (1,886)", "2019-10-31 to 2026-09-18 (1,687)"),
+        ("NIFTY PHARMA", "^CNXPHARMA", "20", "Non-Cyclical Defensive Healthcare", "2019-01-02 to 2026-09-18 (1,886)", "2019-10-31 to 2026-09-18 (1,687)"),
     ]
     for row_idx, row_vals in enumerate(ds_data):
         for col_idx, text_val in enumerate(row_vals):
             cell = ds_table.cell(row_idx, col_idx)
             cell.text = text_val
-    style_table(ds_table, header_bg="1E293B", col_widths=ds_widths)
+    style_table(ds_table, header_bg="1E293B", col_widths=ds_widths, pad_y=40, pad_x=80, font_sz=8.5)
     
     doc.add_page_break()
     
@@ -772,7 +777,7 @@ def build_revised_document():
     add_p(doc,
           "To translate the research engine into a live production system, we developed and deployed a full-stack, cloud-native web application "
           "accessible at https://sector-rotation-regime-discovery.vercel.app/sector-rotation. The architecture comprises:")
-    add_bullet_item(doc, "Automated EOD Ingestion Pipeline: ", "A scheduled GitHub Actions workflow (`daily_eod.yml`) runs every trading day after market close (16:00 IST), fetching updated closing prices from NSE/Yahoo Finance and appending verified session records.")
+    add_bullet_item(doc, "Automated EOD Ingestion Pipeline: ", "A scheduled GitHub Actions workflow (`daily_eod.yml`) runs every trading day after market close (primary run at 19:00 IST, with scheduled retries at 19:30, 20:00, and 20:30 IST to ensure final NSE bhavcopy availability), fetching verified closing prices and appending session records.")
     add_bullet_item(doc, "Serverless PostgreSQL Database: ", "Hosted on Neon Serverless PostgreSQL, storing master trading calendars, historical feature matrices, daily HMM state probabilities, and target weight schedules.")
     add_bullet_item(doc, "Interactive Web Frontend: ", "Built with Next.js 15, React 19, Recharts, and Tailwind CSS, deployed on Vercel. Figures 5.3 through 5.8 illustrate the live interfaces captured directly from the deployed application.")
     
@@ -783,7 +788,7 @@ def build_revised_document():
                "Dynamic Sector Rotation & Allocation Schedule Interface on the deployed web application, detailing active top-2 sector allocations, strategy variant weights, and rebalancing logs.")
                
     add_figure(doc, "scratch/screenshots/03_regime_intelligence.png", "5.5",
-               "Market Regime Intelligence Interface on the deployed web application, illustrating real-time HMM causal probability distributions, historical state timelines, and regime occupancy shares.")
+               "Market Regime Intelligence Interface on the deployed web application, illustrating daily-updated HMM causal forward-filtered probability distributions, historical state timelines, and regime occupancy shares.")
                
     add_figure(doc, "scratch/screenshots/04_portfolio_analytics.png", "5.6",
                "Portfolio Analytics & Historical Backtest Interface on the deployed web application, presenting interactive NAV performance curves, CAGR comparisons, and Sharpe ratio breakdowns.")
@@ -1091,7 +1096,7 @@ def fit_transform_scaler(train_df: pd.DataFrame, test_df: pd.DataFrame, scaler_t
     add_heading_2(doc, "Appendix B: Causal Forward-Filtered State Probability Generation")
     add_p(doc,
           "Source File: `src/regime_discovery.py` | Function: `_hmm_forward_filter()`\n"
-          "Description: Evaluates real-time causal state probabilities P(S_t = j | x_{1:t}) using the forward algorithm without future lookahead.")
+          "Description: Evaluates causal, end-of-day state probabilities P(S_t = j | x_{1:t}) using the forward algorithm without future lookahead.")
           
     code_hmm = """def _hmm_forward_filter(model: GaussianHMM, X: np.ndarray) -> np.ndarray:
     \"\"\"Compute causal (forward-filtered) state probabilities for each observation.
